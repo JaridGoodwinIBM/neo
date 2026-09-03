@@ -191,8 +191,19 @@ the plugin and inspect what actually loaded:
 
 ```bash
 export COPILOT_HOME=$(mktemp -d)
-copilot plugin install ./plugins/neo-core   # reports "Installed N skills."
-copilot plugins list --kind skill --scope plugin
+copilot plugin marketplace add .
+copilot plugin install neo-core@neo   # reports "Installed N skills."
+copilot plugin list                   # plugin present, enabled, live from this repo
+```
+
+The reported skill count is the signal. Do **not** rely on
+`copilot plugins list --kind skill --scope plugin`: on CLI 1.0.81 it reports `No plugins found.`
+even when the skills are loading, so it produces a false negative indistinguishable from a real
+silent failure (issue #101). To confirm a skill actually reached the model, ask a one-shot
+session to name its own skills:
+
+```bash
+copilot -p "List the names of every skill available to you. Do not use any tools."
 ```
 
 Every shipped plugin must carry its Copilot `plugin.json` and `hooks.json`; a missing or

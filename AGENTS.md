@@ -89,9 +89,20 @@ This repo has nothing to compile, lint, or unit-test in the app sense. Do **not*
 
   ```bash
   export COPILOT_HOME=$(mktemp -d)
-  copilot plugin install ./plugins/neo-core    # must say "Installed 3 skills."
-  copilot plugin install ./plugins/neo-product # must say "Installed 4 skills."
-  copilot plugins list --kind skill --scope plugin
+  copilot plugin marketplace add .
+  copilot plugin install neo-core@neo     # must say "Installed 3 skills."
+  copilot plugin install neo-product@neo  # must say "Installed 4 skills."
+  copilot plugin list                     # both plugins present, enabled, live from this repo
+  ```
+
+  The install-time skill count is the signal — **do not** use
+  `copilot plugins list --kind skill --scope plugin`. On CLI 1.0.81 it prints
+  `No plugins found.` even when the skills loaded correctly, so it reads exactly like the
+  issue #81 silent failure it was meant to detect (issue #101). For proof a skill reached
+  the model, ask a one-shot session to name its own skills:
+
+  ```bash
+  copilot -p "List the names of every skill available to you. Do not use any tools."
   ```
 
 Quick manifest sanity check:
