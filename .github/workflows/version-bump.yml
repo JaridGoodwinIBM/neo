@@ -1,0 +1,56 @@
+name: version-bump
+
+# Deterministic SemVer bump: after a merge to main touches a plugin, open a PR that
+# bumps that plugin's version (see scripts/bump-versions.py for the rules).
+# Needs repo setting: Actions > "Allow GitHub Actions to create and approve pull requests".
+# PRs opened with GITHUB_TOKEN don't trigger other workflows; close/reopen the bump PR
+# (or use a PAT/App token) if branch protection requires the validate check.
+
+on:
+  push:
+    branches: [main]
+    paths: ['plugins/**']
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: version-bump
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump versions
+        id: bump
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/bump-versions.py "$BEFORE" "$AFTER" | tee /tmp/bumps.txt
+          echo "changed=$([ -s /tmp/bumps.txt ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate
+        if: steps.bump.outputs.changed == 'true'
+        run: python3 scripts/validate-plugins.py
+
+      - name: Open bump PR
+        if: steps.bump.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          branch="release/version-bump-${GITHUB_SHA::7}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -am "chore(release): bump plugin versions"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "chore(release): bump plugin versions" \
+            --body "$(printf 'Automated SemVer bump for changes merged in %s.\n\n```\n%s\n```' "$GITHUB_SHA" "$(cat /tmp/bumps.txt)")"
