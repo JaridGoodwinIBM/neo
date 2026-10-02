@@ -5,7 +5,7 @@ description: >-
   users and their workflows, market or competitive context, and constraints that bound the problem. Retrieves and
   reports; never mutates. Invoked by the Product Engineer, often several in parallel, one question each. Does not
   decide, design, or write a PRD.
-model: Claude Sonnet 5
+model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: medium
 tools: [read, search, web, execute, todo]
 user-invocable: false

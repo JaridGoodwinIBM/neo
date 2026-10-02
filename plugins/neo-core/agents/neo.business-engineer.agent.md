@@ -1,7 +1,7 @@
 ---
 name: Neo Business Engineer
 description: "Drives the whole Specification loop for a PRD or PRD segment: segments the PRD, runs Feature Agent and Task Planner for each segment, files the approved task set as carrier issues, then spawns one child session per task running Neo Technical Engineer and steers them to draft PRs. Start here when you want the Specification loop driven rather than driving it by hand. Requires the Copilot desktop app — session tools do not exist in a bare terminal. Select it as the session agent; do not delegate to it as a sub-agent."
-model: Claude Opus 5
+model: ["Claude Opus 5.5", "GPT 6 Astra"]
 reasoningEffort: high
 tools:
   [
