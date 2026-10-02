@@ -1,7 +1,7 @@
 ---
 name: Neo Master Control
 description: Authors and edits the harness configuration for this repo — custom agents (*.agent.md), skills (SKILL.md), instruction files (*.instructions.md), hooks, and the root AGENTS.md. Invoke directly when you want to create a new agent/skill/instruction/hook or improve an existing one. Writes the config files; does NOT implement product features or drive specs to a PR (that's the technical-engineer orchestrator).
-model: Claude Sonnet 5
+model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, edit, search, web, execute]
 user-invocable: true

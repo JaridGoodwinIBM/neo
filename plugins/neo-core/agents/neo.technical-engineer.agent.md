@@ -1,7 +1,7 @@
 ---
 name: Neo Technical Engineer
 description: "Takes a spec — a GitHub Issue or Azure DevOps story — and drives it to a draft PR through six phases: branch (named from the spec), research, plan, implement (delegated to code-writer), review (delegated to code-reviewer), and open a draft pull request. Start here for any feature, bug fix, or refactor tied to an issue or story."
-model: Claude Sonnet 5
+model: ["Claude Opus 5.5", "GPT 6 Astra"]
 reasoningEffort: medium
 tools:
   [

@@ -121,10 +121,11 @@ today across both plugins, which is the reference for new agents:
 
 | Role shape                                                                         | Model             | `reasoningEffort` | Example                                                                                                      |
 | ---------------------------------------------------------------------------------- | ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |
-| Planning, decomposition, and orchestration of a whole loop — the hardest reasoning | `Claude Opus 5`   | `high`            | `neo.implementation-planner`, `neo.product.engineer`, `neo.business-engineer`                                |
-| Review, authoring, spec work, facilitation                                         | `Claude Sonnet 5` | `high`            | `neo.code-reviewer`, `neo.feature-agent`, `neo.design.thinking`, `neo.systems.thinking`, `neo.product.coach` |
-| Orchestration and code generation                                                  | `Claude Sonnet 5` | `medium`          | `neo.technical-engineer`, `neo.code-writer`                                                                  |
-| Evidence gathering, where a fabricated citation is expensive                       | `Claude Sonnet 5` | `medium`          | `neo.researcher`, `neo.product.researcher`                                                                   |
+| Planning, decomposition, and orchestration of a whole loop — the hardest reasoning | `Claude Opus 5.5` | `high`            | `neo.implementation-planner`, `neo.product.engineer`, `neo.business-engineer`                                |
+| Review, authoring, spec work, facilitation                                         | `Claude Sonnet 5.5` | `high`            | `neo.code-reviewer`, `neo.feature-agent`, `neo.design.thinking`, `neo.systems.thinking`, `neo.product.coach` |
+| Orchestration of the coding loop                                                   | `Claude Opus 5.5`   | `medium`          | `neo.technical-engineer`                                                                                     |
+| Code generation                                                                    | `Claude Sonnet 5.5` | `medium`          | `neo.code-writer`                                                                                            |
+| Evidence gathering, where a fabricated citation is expensive                       | `Claude Sonnet 5.5` | `medium`          | `neo.researcher`, `neo.product.researcher`                                                                   |
 
 The rule behind the table: raise reasoning where a wrong answer is expensive to _detect_
 (review, planning), lower it where the work is mechanical or the output is checked immediately.
@@ -133,6 +134,8 @@ Researchers used to sit at `Claude Haiku 4.5` / `low` on the theory that gatheri
 That was wrong for the same reason review is expensive: a confabulated citation is _hard to detect_ —
 it reads exactly like a real one, and it propagates through every downstream lens before anyone checks
 it. Evidence work belongs with the expensive-to-detect roles, not the mechanical ones.
+
+Each agent lists a fallback after the primary as a YAML list — `["Claude Opus 5.5", "GPT 6 Astra"]` for the top tier, `["Claude Sonnet 5.5", "GPT 6.1 Sol"]` for the rest.
 
 Model names churn — verify against the target Copilot version, and prefer a name already in use
 in this repo over one from a blog post.
