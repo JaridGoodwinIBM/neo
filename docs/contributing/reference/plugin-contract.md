@@ -191,8 +191,8 @@ the plugin and inspect what actually loaded:
 
 ```bash
 export COPILOT_HOME=$(mktemp -d)
-copilot plugin marketplace add .
-copilot plugin install neo-core@neo   # reports "Installed N skills."
+copilot plugin marketplace add .      # must run from the repo root
+copilot plugin install neo-core@neo   # reports "Installed N skills."; 'neo' is the marketplace name
 copilot plugin list                   # plugin present, enabled, live from this repo
 ```
 
