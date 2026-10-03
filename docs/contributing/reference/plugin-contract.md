@@ -192,19 +192,16 @@ the plugin and inspect what actually loaded:
 ```bash
 export COPILOT_HOME=$(mktemp -d)
 copilot plugin marketplace add .      # must run from the repo root
-copilot plugin install neo-core@neo   # reports "Installed N skills."; 'neo' is the marketplace name
-copilot plugin list                   # plugin present, enabled, live from this repo
+copilot plugin install neo-core@neo   # reports "Installed N skills."
+copilot plugin list                   # confirms installed, enabled, and live directory
+copilot -p "List the exact names of every skill available to you and nothing else."
 ```
 
-The reported skill count is the signal. Do **not** rely on
-`copilot plugins list --kind skill --scope plugin`: on CLI 1.0.81 it reports `No plugins found.`
-even when the skills are loading, so it produces a false negative indistinguishable from a real
-silent failure (issue #101). To confirm a skill actually reached the model, ask a one-shot
-session to name its own skills:
-
-```bash
-copilot -p "List the names of every skill available to you. Do not use any tools."
-```
+`copilot plugins list --kind skill --scope plugin` is unreliable on CLI 1.0.81 — it prints
+`No plugins found.` even when the skills installed and are loading correctly, so it is not a
+valid substitute for the checks above. The direct-install form
+(`copilot plugin install ./plugins/neo-core`) is also deprecated as of 1.0.81; prefer the
+marketplace form shown here except when specifically testing non-default component paths.
 
 Every shipped plugin must carry its Copilot `plugin.json` and `hooks.json`; a missing or
 invalid manifest breaks the plugin. `scripts/validate-plugins.py` enforces that both parse.

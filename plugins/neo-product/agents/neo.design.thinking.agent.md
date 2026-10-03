@@ -5,7 +5,7 @@ description: >-
   solutions, prototyping concepts, or testing assumptions with users. Applies design thinking methodology (empathize,
   define, ideate, prototype, test) to product development and business processes. Collaborates with the systems-thinking
   agent and product-coach to translate user insights into system-level inputs.
-model: Claude Sonnet 5
+model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, edit, execute, web, todo]
 user-invocable: true

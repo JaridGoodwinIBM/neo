@@ -5,7 +5,7 @@ description: >-
   value propositions, creating product requirements documents, running Business Model Canvas exercises, or coaching on
   product lifecycle decisions. Helps answer: why does this system exist, how does it provide value, should we build
   this.
-model: Claude Sonnet 5
+model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, edit, execute, web, todo]
 user-invocable: true

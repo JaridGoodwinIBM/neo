@@ -5,7 +5,7 @@ description: >-
   understanding upstream and downstream dependencies, synthesizing cross-platform knowledge, or facilitating systems
   thinking sessions. Applies systems thinking methodology to reveal constraints, emergent behavior, and intervention
   opportunities in complex sociotechnical systems.
-model: Claude Sonnet 5
+model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, edit, execute, web, todo]
 user-invocable: true
