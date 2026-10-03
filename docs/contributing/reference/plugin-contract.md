@@ -191,7 +191,7 @@ the plugin and inspect what actually loaded:
 
 ```bash
 export COPILOT_HOME=$(mktemp -d)
-copilot plugin marketplace add .
+copilot plugin marketplace add .      # must run from the repo root
 copilot plugin install neo-core@neo   # reports "Installed N skills."
 copilot plugin list                   # confirms installed, enabled, and live directory
 copilot -p "List the exact names of every skill available to you and nothing else."
