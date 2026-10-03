@@ -31,9 +31,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          gh label create "$LABEL" \
-            --description "Docs Consistency Audit run failed" \
-            --color B60205 2>/dev/null || true
+          # The issue is found again by label, so the label has to exist before
+          # the issue is filed. Creating it is best-effort (it usually already
+          # exists), but a genuine failure must not be hidden: if the label is
+          # still missing afterwards, file the issue without it rather than
+          # exiting 1 and losing the alert entirely.
+          # Checked via an exact API lookup rather than `list | grep`: under
+          # `pipefail` an early-exiting reader can SIGPIPE the producer and
+          # report 141 for a *matching* pipeline, silently inverting the test.
+          label_exists() {
+            gh api "repos/$REPO/labels/$LABEL" >/dev/null 2>&1
+          }
+
+          if ! label_exists; then
+            gh label create "$LABEL" --repo "$REPO" \
+              --description "Docs Consistency Audit run failed" \
+              --color B60205 || echo "::warning::could not create label '$LABEL'"
+          fi
+
+          # Carried in the positional params: unlike an empty array, `"$@"`
+          # expands safely under `set -u` on every bash version.
+          set --
+          if label_exists; then
+            set -- --label "$LABEL"
+          else
+            echo "::warning::label '$LABEL' unavailable; filing an unlabelled issue, which breaks reuse"
+          fi
 
           body=$(printf '%s\n' \
             "The [Docs Consistency Audit]($RUN_URL) failed, so the docs were not audited." \
@@ -48,8 +71,14 @@ jobs:
             "" \
             "This issue is reused for repeat failures — check the comments for earlier occurrences. It does not close automatically; close it once a run succeeds.")
 
-          existing=$(gh issue list --repo "$REPO" --label "$LABEL" --state open \
-            --limit 1 --json number --jq '.[0].number // empty')
+          # Reuse is label-based, so only look for a prior issue when the label
+          # is actually in play. No error suppression here: a failed lookup
+          # would otherwise read as "none open" and file a duplicate.
+          existing=""
+          if [ "$#" -gt 0 ]; then
+            existing=$(gh issue list --repo "$REPO" --label "$LABEL" --state open \
+              --limit 1 --json number --jq '.[0].number // empty')
+          fi
 
           if [ -n "$existing" ]; then
             echo "Commenting on existing issue #${existing}"
@@ -58,6 +87,6 @@ jobs:
             echo "Creating new failure issue"
             gh issue create --repo "$REPO" \
               --title "Docs Consistency Audit failed" \
-              --label "$LABEL" \
+              "$@" \
               --body "$body"
           fi
