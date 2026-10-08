@@ -17,8 +17,8 @@ Specification loop. Assumes Neo is already installed (see
 | --- | --- | --- |
 | **Neo Product Engineer** (`product.engineer`) | Orchestrator for the Product loop — drives research → lenses → synthesis → **PRD** | Yes — if you need a PRD |
 | **Neo Product Researcher / Product Coach / Design Thinking Facilitator / Systems Thinking Facilitator** | Product-loop workers: research fan-out, then the viability, desirability, and feasibility lenses | No — the Product Engineer wires them |
-| **Neo Arc Engineer** (`arc-engineer`) | Orchestrator for the Architecture Assessment loop — answers one design question with an evidence-backed **assessment report** | Yes — when a design question needs evidence before anyone builds |
-| **Neo Arc Scout / Reader / Designer / Judge / Synthesizer / Refuter / Critic / Report / Factcheck** | Assessment workers: scout, read, design, judge, synthesize, refute, critique, write, fact-check | No — the Arc Engineer wires them |
+| **Neo Architecture Engineer** (`architecture-engineer`) | Orchestrator for the Architecture Assessment loop — answers one design question with an evidence-backed **assessment report** | Yes — when a design question needs evidence before anyone builds |
+| **Neo Arc Scout / Reader / Designer / Judge / Synthesizer / Refuter / Critic / Report / Factcheck** | Assessment workers: scout, read, design, judge, synthesize, refute, critique, write, fact-check | No — the Architecture Engineer wires them |
 | **Neo Business Engineer** (`business-engineer`) | Orchestrator for the Specification loop — segments the PRD, runs Feature Agent and Task Planner for each segment, files the approved tasks, then spawns one session per task | Yes — if you want the loop driven rather than driving it by hand |
 | **Neo Feature Agent** (`feature-agent`) | Drafts a **Feature** — What/Why/KPIs/verification — from a PRD segment, with you | Yes |
 | **Neo Task Planner** (`task-planner`) | Splits a signed feature into **Tasks**, with you | Yes |
@@ -41,8 +41,9 @@ The Product agents ship in the optional `neo-product` plugin, and the Arc agents
 ## Side path — Assess an architecture question
 
 When a feature, a PRD, or a hunch raises a design question — integrate platform X, add capability
-Y, choose between two patterns, change a contract or data model — select **Neo Arc Engineer** as your
-session agent and state the question. Name any external product it involves.
+Y, choose between two patterns, change a contract or data model — select
+**Neo Architecture Engineer** as your session agent and state the question. Name any external
+product it involves.
 
 It may ask you to pin down an ambiguous word, then runs unattended: a scout maps the territory,
 readers report one area each, three designers propose from different angles, three judges score

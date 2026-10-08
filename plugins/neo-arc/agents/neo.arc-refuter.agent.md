@@ -3,8 +3,8 @@ name: Neo Arc Refuter
 description: >-
   Tries to refute one load-bearing reuse claim from an architecture assessment by reading the code — defaults to
   "refuted" when the claim cannot be confirmed — and returns a verdict, confidence, reason, file:line evidence, and a
-  corrected reuse grade in a fixed template. Read-only. Invoked by Neo Arc Engineer, one per claim in parallel, up to
-  sixteen; not for direct use.
+  corrected reuse grade in a fixed template. Read-only. Invoked by Neo Architecture Engineer, one per claim in
+  parallel, up to sixteen; not for direct use.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, execute]

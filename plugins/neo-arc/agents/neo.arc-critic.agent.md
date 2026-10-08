@@ -3,8 +3,8 @@ name: Neo Arc Critic
 description: >-
   Reviews an architecture assessment for completeness before the report is written — what nobody read, which claims
   remain unverified, what is premature or overbuilt given the team's delivery posture, and the single sharpest question
-  that gates the design — in a fixed template. Read-only. Invoked once by Neo Arc Engineer after the refuters; not for
-  direct use. Does not rewrite the recommendation.
+  that gates the design — in a fixed template. Read-only. Invoked once by Neo Architecture Engineer after the refuters;
+  not for direct use. Does not rewrite the recommendation.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, execute]

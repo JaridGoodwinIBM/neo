@@ -58,7 +58,7 @@ The shipped agents:
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `plugins/neo-core/`    | `business-engineer` (Specification-loop orchestrator), `technical-engineer` (Coding-loop orchestrator — start here for one task), `researcher`, `implementation-planner`, `code-writer`, `code-reviewer`, `feature-agent`, `task-planner` |
 | `plugins/neo-product/` | `product.engineer` (orchestrator — start here), `product.researcher`, `product.coach`, `design.thinking`, `systems.thinking`                              |
-| `plugins/neo-arc/`     | `arc-engineer` (orchestrator — start here), `arc-scout`, `arc-reader`, `arc-designer`, `arc-judge`, `arc-synthesizer`, `arc-refuter`, `arc-critic`, `arc-report`, `arc-factcheck` |
+| `plugins/neo-arc/`     | `architecture-engineer` (orchestrator — start here), `arc-scout`, `arc-reader`, `arc-designer`, `arc-judge`, `arc-synthesizer`, `arc-refuter`, `arc-critic`, `arc-report`, `arc-factcheck` |
 
 `master-control` is dev-time only and lives at the repo root, never in a plugin.
 

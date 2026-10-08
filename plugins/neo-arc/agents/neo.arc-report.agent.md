@@ -4,7 +4,7 @@ description: >-
   Writes the architecture assessment report from the synthesis, the refuters' verdicts, and the critique — Markdown with
   Mermaid figures, plus a self-contained HTML companion with drawn figures when asked — carrying the refuters' corrected
   reuse grades, not the synthesizer's originals. Writes only the report file(s) at the path it is given. Invoked once by
-  Neo Arc Engineer; not for direct use. Never stages or commits, and never edits an ADR, PRD, or source file.
+  Neo Architecture Engineer; not for direct use. Never stages or commits, and never edits an ADR, PRD, or source file.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, edit, execute]

@@ -4,7 +4,7 @@ A concept-to-spec-to-PR multi-agent coding system for GitHub Copilot CLI.
 
 Initiate a new product platform (greenfield) or an existing codebase (brownfield) by invoking the **Neo Product Engineer**. It drives research → viability/desirability/feasibility lenses → synthesis → a PRD, which the Specification loop then segments into features and tasks.
 
-Answer an architecture design question with evidence from the codebase by invoking **Neo Arc Engineer**. It runs a scout, parallel readers, three competing designs, a judge panel, a synthesis whose every reuse claim is handed to a refuter, a critic, and a fact-checked report.
+Answer an architecture design question with evidence from the codebase by invoking **Neo Architecture Engineer**. It runs a scout, parallel readers, three competing designs, a judge panel, a synthesis whose every reuse claim is handed to a refuter, a critic, and a fact-checked report.
 
 Initiate a new feature and taskset. Given a GitHub Issue or Azure DevOps story, an orchestrator drives it through
 research → plan → implement → review → draft PR.
@@ -22,10 +22,10 @@ holds manifests, docs, and dev-time-only tooling.
 - `plugins/neo-product/` — the optional Product loop. Agents (`product.engineer` orchestrator, plus
   `product.researcher`, `product.coach`, `design.thinking`, `systems.thinking`), the three product
   skills, and its own copy of the hooks + logger.
-- `plugins/neo-arc/` — the optional Architecture Assessment loop. Agents (`arc-engineer` orchestrator,
-  plus `arc-scout`, `arc-reader`, `arc-designer`, `arc-judge`, `arc-synthesizer`, `arc-refuter`,
-  `arc-critic`, `arc-report`, `arc-factcheck`), its copy of the evidence skill, and its own copy of
-  the hooks + logger.
+- `plugins/neo-arc/` — the optional Architecture Assessment loop. Agents (`architecture-engineer`
+  orchestrator, plus `arc-scout`, `arc-reader`, `arc-designer`, `arc-judge`, `arc-synthesizer`,
+  `arc-refuter`, `arc-critic`, `arc-report`, `arc-factcheck`), its copy of the evidence skill, and
+  its own copy of the hooks + logger.
 - `.github/agents/` (repo root) — `master-control`, the **dev-time** agent that authors this
   harness config. Never shipped.
 - `.github/plugin/marketplace.json` — the marketplace manifest (stays at root, lists each plugin
@@ -42,7 +42,7 @@ New here? Start at [`docs/getting-started.md`](docs/getting-started.md). To prod
 the **product.engineer** with a problem or opportunity. To run the specification loop end to end,
 invoke the **business-engineer** with a PRD; to run the coding crew on a single task, invoke the
 **technical-engineer** with an issue/story reference. To assess an architecture question, invoke
-the **arc-engineer** with the question. See
+the **architecture-engineer** with the question. See
 [`docs/guides/using-neo.md`](docs/guides/using-neo.md) for the workflow and
 `docs/concepts/process-flow.md` for the loop boundaries.
 

@@ -4,7 +4,7 @@ description: >-
   Reads one area of the codebase for an architecture assessment and reports it in a fixed template — summary, existing
   mentions of the subject, reuse claims graded verbatim / extend / pattern-only / not-reusable with file:line, gaps,
   constraints, and facts with evidence. Also serves as the external-product reader, from fetched primary sources.
-  Read-only. Invoked by Neo Arc Engineer, often eight to eleven in parallel, one area each; not for direct use.
+  Read-only. Invoked by Neo Architecture Engineer, often eight to eleven in parallel, one area each; not for direct use.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: medium
 tools: [read, search, web, execute]

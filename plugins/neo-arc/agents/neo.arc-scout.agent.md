@@ -3,8 +3,8 @@ name: Neo Arc Scout
 description: >-
   Scouts the repository for one architecture design question and returns the reader brief — the areas the question
   touches, the anchor files for each, keyword hits showing where the codebase already anticipates the subject, and what
-  the question means where its words are ambiguous. Read-only. Invoked by Neo Arc Engineer as the first stage of an
-  assessment, not directly by the user. Does not design, judge, or recommend.
+  the question means where its words are ambiguous. Read-only. Invoked by Neo Architecture Engineer as the first stage
+  of an assessment, not directly by the user. Does not design, judge, or recommend.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: medium
 tools: [read, search, execute]
