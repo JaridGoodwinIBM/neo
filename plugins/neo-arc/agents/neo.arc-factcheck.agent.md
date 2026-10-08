@@ -3,8 +3,8 @@ name: Neo Arc Factcheck
 description: >-
   Fact-checks a written architecture assessment report for one check kind — repository facts against the code, external
   claims against fetched primary sources, or document structure (Mermaid syntax, links, tables, one claim per figure) —
-  and returns severity-tagged findings with evidence and fixes in a fixed template. Read-only. Invoked by Neo Arc
-  Assess, three in parallel with one check kind each; not for direct use. Reports fixes; never applies them.
+  and returns severity-tagged findings with evidence and fixes in a fixed template. Read-only. Invoked by
+  Neo Arc Engineer, three in parallel with one check kind each; not for direct use. Reports fixes; never applies them.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high
 tools: [read, search, web, execute]

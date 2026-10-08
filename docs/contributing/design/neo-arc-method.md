@@ -152,7 +152,7 @@ Ten agents, one per stage, in Copilot's `.agent.md` format (`name`, `description
 
 | Agent | Tools | Input | Output | Runs |
 | --- | --- | --- | --- | --- |
-| `Neo Arc Assess` | agent, read, search, edit | the design question | the report file(s) in the repository's reports folder | 1 |
+| `Neo Arc Engineer` | agent, read, search, edit | the design question | the report file(s) in the repository's reports folder | 1 |
 | `Neo Arc Scout` | read, search | the question | reader brief: areas, anchor files, keyword hits, what the question means | 1 |
 | `Neo Arc Reader` | read, search, web | one area brief + the question | Reader template | 8-11 in parallel |
 | `Neo Arc Designer` | read, search | evidence map + one angle | Design template | 3 in parallel |
@@ -215,7 +215,7 @@ changed is the packaging, to conform to Neo's contracts. Each row names the rule
 | Source design | Shipped in `neo-arc` | Why |
 | --- | --- | --- |
 | Ten loose agent files in a repository | `plugins/neo-arc/agents/` | A shipped role lives under `plugins/*/`; `.github/` inside a plugin fails silently. [`plugin-contract.md`](../reference/plugin-contract.md) § 1 |
-| Role names under a project prefix | `neo.arc-assess.agent.md` … `neo.arc-factcheck.agent.md`; `name: Neo Arc Assess` … | Flat `neo.<role>` form for a single-domain plugin, `Neo <Role>` names; the `arc-` prefix keeps roles unique across plugins. [`plugin-contract.md`](../reference/plugin-contract.md) § 4 |
+| Role names under a project prefix | `neo.arc-engineer.agent.md` … `neo.arc-factcheck.agent.md`; `name: Neo Arc Engineer` … | Flat `neo.<role>` form for a single-domain plugin, `Neo <Role>` names; the `arc-` prefix keeps roles unique across plugins. The orchestrator follows the `<Domain> Engineer` entry-point naming of the Product, Specification, and Coding loops. [`plugin-contract.md`](../reference/plugin-contract.md) § 4 |
 | A wildcard `agents:` allowlist | An explicit allowlist of the nine exact worker `name:` values | Copilot resolves delegation targets by exact `name:`; the validator rejects entries that don't resolve |
 | `version:` and `phase:` frontmatter | Dropped | Provenance keys are not part of the agent frontmatter contract |
 | `$ARGUMENTS` input block | Dropped; each worker's `## Input` section names what the orchestrator passes | Not a Copilot agent feature |

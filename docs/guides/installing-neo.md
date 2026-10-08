@@ -81,7 +81,7 @@ install the Architecture Assessment loop:
 copilot plugin install neo-arc@neo
 ```
 
-It adds the **Neo Arc Assess** orchestrator and nine read-only workers, and it ends at an
+It adds the **Neo Arc Engineer** orchestrator and nine read-only workers, and it ends at an
 **assessment report**. It stands beside the other loops rather than in their chain, so it needs
 neither `neo-product` nor a PRD. If your `AGENTS.md` names a folder for architecture assessments,
 the report goes there; otherwise it defaults to `docs/design/assessments/`.

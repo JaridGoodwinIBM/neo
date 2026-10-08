@@ -19,7 +19,7 @@ The method's design record is
 
 ## Shape
 
-- **Orchestrator:** `neo.arc-assess.agent.md` — **Neo Arc Assess**. Select it as your session agent.
+- **Orchestrator:** `neo.arc-engineer.agent.md` — **Neo Arc Engineer**. Select it as your session agent.
 - **Stages** — a fixed skeleton; the scale knob is the number of readers and refuters, never the shape:
   1. **Scout** — one run; produces the reader brief. Nothing spawns until it exists.
   2. **Readers** — one per area, in parallel (eight to eleven for a full question, plus one for any named external
@@ -45,7 +45,7 @@ The method's design record is
 
 | File | Agent `name:` | Role | Runs |
 | --- | --- | --- | --- |
-| `neo.arc-assess.agent.md` | `Neo Arc Assess` | Orchestrates the loop; the entry point. `user-invocable` | 1 |
+| `neo.arc-engineer.agent.md` | `Neo Arc Engineer` | Orchestrates the loop; the entry point. `user-invocable` | 1 |
 | `neo.arc-scout.agent.md` | `Neo Arc Scout` | Reader brief: areas, anchor files, keyword hits, what the question means | 1 |
 | `neo.arc-reader.agent.md` | `Neo Arc Reader` | One area of the codebase, or the named external product, in the Reader template | one per area, parallel |
 | `neo.arc-designer.agent.md` | `Neo Arc Designer` | One design from one assigned angle | 3, parallel |

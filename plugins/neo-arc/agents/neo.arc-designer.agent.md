@@ -3,7 +3,7 @@ name: Neo Arc Designer
 description: >-
   Produces one independent architecture design for an assessment from an assigned angle — what the capability means
   here, its stages, new and reused components by path, settings with defaults, ADR conflicts, human gates, risks, and
-  the questions only the user can answer — in a fixed template. Read-only. Invoked by Neo Arc Assess, three in
+  the questions only the user can answer — in a fixed template. Read-only. Invoked by Neo Arc Engineer, three in
   parallel with one angle each; not for direct use. Does not judge other designs or recommend a winner.
 model: ["Claude Opus 5.5", "GPT 6 Astra"]
 reasoningEffort: high

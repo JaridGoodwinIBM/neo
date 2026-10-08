@@ -4,7 +4,7 @@ description: >-
   Builds the phased architecture recommendation for an assessment from the judges' consensus winner plus the grafts —
   recommendation, phased plan, at most sixteen load-bearing reuse claims, what is not reusable, ADR and PRD work, the
   decisions only the user can make, and where the judges disagreed — in a fixed template. Read-only. Invoked once by
-  Neo Arc Assess after the judge panel; not for direct use. Does not verify its own claims; refuters do that.
+  Neo Arc Engineer after the judge panel; not for direct use. Does not verify its own claims; refuters do that.
 model: ["Claude Opus 5.5", "GPT 6 Astra"]
 reasoningEffort: high
 tools: [read, search, execute]

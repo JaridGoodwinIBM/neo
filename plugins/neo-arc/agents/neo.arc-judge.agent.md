@@ -3,7 +3,7 @@ name: Neo Arc Judge
 description: >-
   Scores three competing architecture designs through one assigned lens — repository maintainer, domain architect, or
   security and governance reviewer — on reuse, ADR fit, fit to the ask, risk, and deliverability, names the winner,
-  what to graft from the others, and any factual errors it spots with file:line. Read-only. Invoked by Neo Arc Assess,
+  what to graft from the others, and any factual errors it spots with file:line. Read-only. Invoked by Neo Arc Engineer,
   three in parallel with one lens each; not for direct use. Does not write a design or a recommendation.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
 reasoningEffort: high

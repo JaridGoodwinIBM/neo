@@ -115,7 +115,7 @@ same route that repo gets its `AGENTS.md`.
 | `neo-product-requirements` skill | `neo-product` | Owns the PRD artifact and template |
 | `neo-design-thinking` skill | `neo-product` | |
 | `neo-system-thinking` skill | `neo-product` | Directory name is singular; the agent is `systems.thinking` |
-| `arc-assess` (orchestrator) | `neo-arc` | Entry point for the Architecture Assessment loop |
+| `arc-engineer` (orchestrator) | `neo-arc` | Entry point for the Architecture Assessment loop |
 | `arc-scout` | `neo-arc` | Writes the reader brief; runs first |
 | `arc-reader` | `neo-arc` | Fanned out in parallel, one area each |
 | `arc-designer` | `neo-arc` | Three in parallel, one angle each |
