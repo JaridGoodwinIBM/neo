@@ -117,7 +117,7 @@ a known alias nor a known host tool is reported as a probable typo.
 ### Model selection
 
 `model` and `reasoningEffort` are chosen per role, never left to the default. What Neo ships
-today across both plugins, which is the reference for new agents:
+today across its plugins, which is the reference for new agents:
 
 | Role shape                                                                         | Model             | `reasoningEffort` | Example                                                                                                      |
 | ---------------------------------------------------------------------------------- | ----------------- | ----------------- | ------------------------------------------------------------------------------------------------------------ |

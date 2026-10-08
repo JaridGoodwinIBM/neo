@@ -12,9 +12,9 @@ fields, and the `neo-` naming convention.
 > carries no `agents/`, `skills/`, `.claude/`, or `.claude-plugin/` trees, and there is no
 > mirror or dual-manifest rule to maintain.
 
-Neo is a **monorepo of plugins**. Shipped plugins live under `plugins/`; today there are two,
-`plugins/neo-core/` (the coding and specification crew) and `plugins/neo-product/` (the
-Product loop). The repo root holds the marketplace manifest, docs, and dev-time-only
+Neo is a **monorepo of plugins**. Shipped plugins live under `plugins/`; today there are three,
+`plugins/neo-core/` (the coding and specification crew), `plugins/neo-product/` (the
+Product loop), and `plugins/neo-arc/` (the Architecture Assessment loop). The repo root holds the marketplace manifest, docs, and dev-time-only
 tooling. Per-stack plugins (e.g. a hypothetical `plugins/neo-react/`) are added the same way
 `neo-core` is packaged — this contract governs all of them.
 
@@ -32,7 +32,8 @@ neo/
 │       └── neo.master-control.agent.md   # DEV-TIME agent (Copilot), never shipped
 ├── plugins/
 │   ├── neo-core/                     # a shipped plugin (see §1 for its shape)
-│   └── neo-product/                  # a shipped plugin — the Product loop
+│   ├── neo-product/                  # a shipped plugin — the Product loop
+│   └── neo-arc/                      # a shipped plugin — the Architecture Assessment loop
 ├── scripts/
 │   └── validate-plugins.py           # CI: asserts each plugin's Copilot manifests + allowlists are valid
 └── docs/                             # this spec, glossary, architecture, etc. — not shipped
@@ -113,7 +114,8 @@ them is still valid.
 ### 2.1 A plugin's `plugin.json`
 
 `plugin.json` lives at the **plugin root**. Values below are transcribed from
-`plugins/neo-core/`; `plugins/neo-product/` carries the same fields with its own values.
+`plugins/neo-core/`; `plugins/neo-product/` and `plugins/neo-arc/` carry the same fields with
+their own values.
 
 | Field         | Value                                            | Spec        | House rule                       |
 | ------------- | ------------------------------------------------ | ----------- | -------------------------------- |
@@ -145,7 +147,7 @@ Unlike a plugin tree, this file *is* repo-scoped, so `.github/plugin/` is the ri
 | `owner.name`            | `"skyarkitekten"`                     | Required.                                  |
 | `metadata.description`  | present                               | Required.                                  |
 | `metadata.version`      | `"2.0.4"`                             | Required.                                  |
-| `plugins[].name`        | `"neo-core"`, `"neo-product"`         | Required — one entry per shipped plugin.   |
+| `plugins[].name`        | `"neo-core"`, `"neo-product"`, `"neo-arc"` | Required — one entry per shipped plugin.   |
 | `plugins[].source`      | `"plugins/neo-core"`                  | Required — repo-root-relative path.        |
 | `plugins[].description` | present                               | Required.                                  |
 | `plugins[].version`     | semver, matching that plugin's `plugin.json` | Required.                           |
@@ -213,10 +215,10 @@ owned by [`hook-contract.md`](./hook-contract.md).
 ### 3.1 What must stay consistent
 
 - `name` — `"neo"` (marketplace top-level) and the per-plugin names (`"neo-core"`,
-  `"neo-product"`).
+  `"neo-product"`, `"neo-arc"`).
 - `version` — a plugin's `plugin.json` and its `plugins[].version` entry in the marketplace
   must agree. Plugins version **independently** of each other and of `metadata.version`, so
-  `neo-core` and `neo-product` are expected to sit at different numbers.
+  `neo-core`, `neo-product`, and `neo-arc` are expected to sit at different numbers.
 - `license`, `author.name` / `owner.name` — identity describes one project.
 - `keywords[]` — kept meaningful per manifest.
 - `plugins[].source` — the `./`-prefixed value pointing at the plugin directory.
@@ -248,7 +250,9 @@ sits in a marketplace alongside others.
 - **An optional domain segment** is permitted where a plugin groups agents by discipline:
   `neo.<domain>.<role>.agent.md` (e.g. `neo.design.ux.agent.md`, `neo.product.coach.agent.md`).
   Both segments stay kebab-case. Use it only when the plugin has two or more domains; a
-  single-domain plugin like `neo-core` stays on the flat `neo.<role>` form.
+  single-domain plugin like `neo-core` stays on the flat `neo.<role>` form. Where a
+  single-domain plugin's roles would otherwise read as generic across the marketplace, prefix
+  the role instead (`neo.arc-scout.agent.md`, `name: Neo Arc Scout`) — still the flat form.
 - **`name:` is the display identity**, always `Neo <Role>`. It need not be a mechanical
   transform of the filename, but must unambiguously identify the same agent. The `Neo ` prefix
   is what prevents collisions in a shared marketplace, so it is never omitted.
