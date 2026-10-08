@@ -5,8 +5,8 @@ description: >-
   Mermaid figures, plus a self-contained HTML companion with drawn figures when asked — carrying the refuters' corrected
   reuse grades, not the synthesizer's originals. Writes only the report file(s) at the path it is given. Invoked once by
   Neo Architecture Engineer; not for direct use. Never stages or commits, and never edits an ADR, PRD, or source file.
-model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
-reasoningEffort: high
+model: ["Claude Haiku 5.5", "GPT-5.4 mini"]
+reasoningEffort: medium
 tools: [read, edit, execute]
 user-invocable: false
 ---

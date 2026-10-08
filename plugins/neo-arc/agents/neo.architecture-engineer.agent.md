@@ -7,8 +7,7 @@ description: >-
   reuse claim, a completeness critic, a written report, and three fact-checkers. Ends in an assessment report with a
   recommended shape, a phased plan, verified reuse claims, the decisions only the user can make, and the single
   question that gates the design. Select it as your session agent; it routes and assembles, never implements.
-model: ["Claude Opus 5.5", "GPT 6 Astra"]
-reasoningEffort: high
+model: ["HydraFusion", "Claude Opus 5.5", "GPT 6 Astra"]
 tools: [agent, read, search, edit, execute, todo]
 agents:
   [
