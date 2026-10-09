@@ -34,11 +34,44 @@ The method's design record is
      Errors and warnings are applied before the report is presented.
 
 ```mermaid
-flowchart LR
-    S[Scout] --> R[Readers<br/>parallel] --> B1{{barrier}}
-    B1 --> D[Designers x3] --> J[Judges x3] --> Y[Synthesizer]
-    Y --> F[Refuters<br/>one per claim] --> B2{{barrier}}
-    B2 --> C[Critic] --> W[Report] --> K[Fact-checkers x3]
+flowchart TB
+    Q([Design question]) --> S
+
+    subgraph P1[1. Orient]
+        S["Scout<br/>1 agent"]
+    end
+    S -- "reader brief:<br/>areas, anchor files" --> R
+
+    subgraph P2[2. Read]
+        R["Readers<br/>8-11 in parallel<br/>one per area"]
+    end
+    R -- "evidence maps<br/>BARRIER: all must return" --> D
+
+    subgraph P3[3. Design and judge]
+        D["Designers x3<br/>smallest change / mirror existing / first-class"]
+        J["Judges x3<br/>maintainer / domain / security"]
+        Y["Synthesizer<br/>winner + grafts<br/>max 16 reuse claims"]
+        D -- "3 designs" --> J
+        J -- "scores, winner" --> Y
+    end
+    Y -- "load-bearing reuse claims" --> F
+
+    subgraph P4[4. Try to break it]
+        F["Refuters<br/>one per claim, parallel<br/>default verdict: REFUTED"]
+        C["Critic<br/>gaps, overbuilt,<br/>gating question"]
+        F -- "verdicts + corrected grades<br/>BARRIER" --> C
+    end
+    C -- critique --> W
+
+    subgraph P5[5. Write and check]
+        W["Report writer<br/>Markdown + Mermaid"]
+        K["Fact-checkers x3<br/>repo / external / structure"]
+        W -- draft report --> K
+    end
+    K -- "errors and warnings applied" --> O([Assessment report])
+
+    classDef key fill:#fde8e8,stroke:#c0392b,stroke-width:2px;
+    class F key;
 ```
 
 - **Contracts:** every worker returns one fixed Markdown template and nothing else. Each worker's file owns its
