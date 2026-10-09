@@ -32,6 +32,15 @@ The method's design record is
   6. **Critic** — what nobody read, what is unverified or overbuilt, and the sharpest question.
   7. **Report**, then **fact-checkers** — three in parallel: repository facts, external claims, document structure.
      Errors and warnings are applied before the report is presented.
+
+```mermaid
+flowchart LR
+    S[Scout] --> R[Readers<br/>parallel] --> B1{{barrier}}
+    B1 --> D[Designers x3] --> J[Judges x3] --> Y[Synthesizer]
+    Y --> F[Refuters<br/>one per claim] --> B2{{barrier}}
+    B2 --> C[Critic] --> W[Report] --> K[Fact-checkers x3]
+```
+
 - **Contracts:** every worker returns one fixed Markdown template and nothing else. Each worker's file owns its
   template; the orchestrator checks the headings, re-runs once on a mismatch, and records a second failure rather than
   retrying.
