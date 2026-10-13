@@ -1,8 +1,11 @@
 import { defineWorkflow, joinSession } from "@github/copilot-sdk/extension";
 import {
+    FACTCHECK_COLUMNS,
+    FACTCHECK_KINDS,
     REUSE_GRADES,
     TEMPLATES,
     checkTemplate,
+    classifyFindings,
     deriveReportPath,
     htmlCompanionPath,
     nextAttempt,
@@ -15,11 +18,12 @@ import {
 import {
     parseAreas,
     parseExternalProduct,
+    parseFactcheck,
     parseRefuterVerdict,
     parseReuseClaims,
     sectionText,
 } from "./parse.mjs";
-import { findGitRoot, persistReportFiles, preflightReportFiles } from "./report-write.mjs";
+import { findGitRoot, persistReportFiles, preflightReportFiles, replaceReportFiles } from "./report-write.mjs";
 
 const AGENTS = {
     scout: "neo-arc:neo.arc-scout",
@@ -30,13 +34,15 @@ const AGENTS = {
     refuter: "neo-arc:neo.arc-refuter",
     critic: "neo-arc:neo.arc-critic",
     report: "neo-arc:neo.arc-report",
+    factcheck: "neo-arc:neo.arc-factcheck",
 };
 
 const STEP_VERSION = "assessment-v1";
 const MAX_REFUTERS = 16;
 // 1 Scout + up to 12 Readers (11 areas + external) + 3 Designers + 3 Judges + 1 Synthesizer + 16 Refuters + 1 Critic
-// + 1 Report = 38 logical calls, each with at most one retry (manual for template workers, the SDK schema retry for Report).
-const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1 + 1;
+// + 1 Report + 3 Factcheckers + at most 1 correction Report = 42 logical calls, each with at most one retry
+// (manual for template workers, the SDK schema retry for Report).
+const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1 + 1 + 3 + 1;
 const MAX_TOTAL_SUBAGENTS = MAX_LOGICAL_CALLS * 2;
 
 const REPORT_SCHEMA = {
@@ -48,6 +54,8 @@ const REPORT_SCHEMA = {
         receipt: { type: "string" },
     },
 };
+
+const FACTCHECK_UNITS = Object.keys(FACTCHECK_KINDS).map((id) => ({ id, kind: FACTCHECK_KINDS[id] }));
 
 const DESIGNER_ANGLES = [
     {
@@ -75,10 +83,16 @@ const JUDGE_LENSES = [
 
 function retryPrompt(prompt, role, problems) {
     const headings = TEMPLATES[role].map((h) => `## ${h}`).join("\n");
+    const table =
+        role === "factcheck"
+            ? `\n\nUnder "## Findings" use only this table header (an empty table is valid when there are no findings; ` +
+              `Severity is exactly error, warning or nit; Recommendation impact is exactly yes, no or unclear):\n` +
+              `| ${FACTCHECK_COLUMNS.join(" | ")} |\n| ${FACTCHECK_COLUMNS.map(() => "---").join(" | ")} |`
+            : "";
     return (
         `${prompt}\n\nYour previous reply was rejected: ${problems.join("; ")}.\n` +
         `Reply with exactly these \`##\` headings, in this order, and nothing before the first heading:\n\n` +
-        `${headings}\n\nReturn only this template.`
+        `${headings}${table}\n\nReturn only this template.`
     );
 }
 
@@ -138,12 +152,15 @@ const neoArcAssessment = defineWorkflow({
         name: "neo-arc-assessment",
         description:
             "Explicit-only: run only when the user asks for the neo-arc-assessment workflow by name. " +
-            "Partial Neo Arc assessment, Scout through Report (no Factcheck): " +
-            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic → Report. " +
+            "Neo Arc assessment, Scout through Factcheck/correction: " +
+            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic → Report → " +
+            "Factcheck (3 checkers in parallel: repository facts, external claims, document structure; at most one correction Report call). " +
             "The workflow itself writes the report Markdown (and an optional sibling HTML) under docs/design/assessments/; " +
-            "the Report worker returns content only. " +
-            "Call ceiling: at most 38 logical calls (1 Scout + up to 12 Readers + 3 Designers + 3 Judges + 1 Synthesizer + " +
-            "16 Refuters + 1 Critic + 1 Report), each with at most one retry = 76 subagent attempts (maxTotalSubagents). " +
+            "the Report worker returns content only. Errors and warnings that cannot change the recommendation are corrected once; " +
+            "any finding that could (impact yes/unclear) returns needs_user_decision without revising. " +
+            "Call ceiling: at most 42 logical calls (1 Scout + up to 12 Readers + 3 Designers + 3 Judges + 1 Synthesizer + " +
+            "16 Refuters + 1 Critic + 1 Report + 3 Factcheckers + 1 correction Report), each with at most one retry = " +
+            "84 subagent attempts (maxTotalSubagents). " +
             "No AI-credit estimate is made. " +
             "args: { question: string, outputPath?: string (repo-relative .md under docs/design/assessments/; default " +
             "docs/design/assessments/<YYYY-MM-DD>-<topic-slug>-assessment.md), html?: boolean (default false; sibling .html), " +
@@ -157,6 +174,7 @@ const neoArcAssessment = defineWorkflow({
             { title: "Refuters" },
             { title: "Critic" },
             { title: "Report" },
+            { title: "Factcheck" },
         ],
         argsSchema: {
             type: "object",
@@ -227,13 +245,14 @@ const neoArcAssessment = defineWorkflow({
                 },
             };
         };
-        const fail = (failedStage, error) => ({
+        const fail = (failedStage, error, extra = {}) => ({
             ok: false,
             question,
             failedStage,
             error,
             coverage: buildCoverage(),
             outputs,
+            ...extra,
         });
         const failureText = (name, result) =>
             `${name} failed after ${result.attempts} attempt(s): ${(result.problems ?? []).join("; ")}`;
@@ -424,31 +443,167 @@ const neoArcAssessment = defineWorkflow({
         if (!report.ok) return fail("report", `report failed: ${report.error}`);
         outputs.report = report.receipt;
 
-        const files = [{ relPath: paths.markdownPath, content: ensureTrailingNewline(report.markdown) }];
-        if (wantHtml) files.push({ relPath: paths.htmlPath, content: ensureTrailingNewline(report.html) });
+        // The initial contents stay in memory: they are the compare-and-swap baseline for the correction.
+        const initialFiles = [{ relPath: paths.markdownPath, content: ensureTrailingNewline(report.markdown) }];
+        if (wantHtml) initialFiles.push({ relPath: paths.htmlPath, content: ensureTrailingNewline(report.html) });
         let written;
         try {
-            written = await ctx.step(`${STEP_VERSION}:report:write`, () => persistReportFiles(gitRoot, files, overwrite), {
-                // Always re-check the disk on resume; the write itself is idempotent.
-                volatile: true,
-            });
+            // Journaled (not volatile): on resume after a correction the disk holds the revised content, which this
+            // step must neither overwrite nor fail against. An interrupted write is never journaled and reruns
+            // idempotently. The original overwrite consent applies here and nowhere else.
+            written = await ctx.step(`${STEP_VERSION}:report:write`, () => persistReportFiles(gitRoot, initialFiles, overwrite));
         } catch (error) {
             return fail("report", `report write failed: ${error.message}`);
         }
+        let reportInfo = { path: paths.markdownPath, htmlPath: paths.htmlPath, written, receipt: report.receipt };
 
-        return {
+        // Factcheck: three checkers read the persisted report in parallel.
+        ctx.phase("Factcheck");
+        const checkResults = await runParallel(ctx, FACTCHECK_UNITS, (unit) =>
+            runWorker(ctx, {
+                role: "factcheck",
+                item: unit.id,
+                prompt:
+                    `Fact-check the written architecture assessment report at this repository-relative path: ${paths.markdownPath}\n` +
+                    `Check kind: ${unit.kind}\n` +
+                    `Return the Findings table with columns ${FACTCHECK_COLUMNS.join(" | ")}. Severity is exactly error, warning ` +
+                    `or nit. Recommendation impact is exactly yes, no or unclear: yes means applying the fix without user input ` +
+                    `could change the recommended shape or a decision gate; use unclear when you are not sure. ` +
+                    `An empty table means no findings.`,
+                validate: (reply) => parseFactcheck(reply, unit.id),
+            }),
+        );
+        record("factcheck", FACTCHECK_UNITS.map((u) => u.id), checkResults);
+        outputs.factcheck = acceptedOutputs(checkResults);
+        const failedCheck = FACTCHECK_UNITS.find((u) => checkResults[u.id].status !== "accepted");
+        if (failedCheck) {
+            return fail("factcheck", failureText(`factcheck ${failedCheck.id}`, checkResults[failedCheck.id]), { report: reportInfo });
+        }
+        const checks = [];
+        const findings = [];
+        for (const unit of FACTCHECK_UNITS) {
+            const parsed = parseFactcheck(checkResults[unit.id].output, unit.id);
+            checks.push({ id: unit.id, kind: parsed.kind, checked: parsed.checked, attempts: checkResults[unit.id].attempts });
+            for (const f of parsed.findings) findings.push({ source: parsed.kind, ...f });
+        }
+        const classified = classifyFindings(findings);
+        const factcheck = {
+            checks,
+            summary: { counts: classified.counts, recommendationImpact: classified.recommendationImpact },
+            findings,
+        };
+        const finalCoverage = buildCoverage();
+
+        // Any finding that could change the recommendation or a gate goes to the user; Report is never asked.
+        if (classified.blocking.length > 0) {
+            return {
+                ok: false,
+                status: "needs_user_decision",
+                question,
+                error:
+                    `${classified.blocking.length} finding(s) could change the recommendation or a decision gate ` +
+                    `(recommendation impact yes/unclear); the report was not revised`,
+                outputs,
+                claims,
+                coverage: finalCoverage,
+                report: reportInfo,
+                factcheck,
+                blocking: classified.blocking,
+            };
+        }
+
+        const success = (status) => ({
             ok: true,
+            status,
             question,
             outputs,
             claims,
-            coverage,
-            report: {
-                path: paths.markdownPath,
-                htmlPath: paths.htmlPath,
-                written,
-                receipt: report.receipt,
-            },
-        };
+            coverage: finalCoverage,
+            report: reportInfo,
+            factcheck,
+            nits: classified.nits,
+        });
+
+        if (classified.actionable.length === 0) {
+            // Nothing to correct; prove the persisted report is still what was checked (overwrite never allowed here).
+            try {
+                const verified = await ctx.step(
+                    `${STEP_VERSION}:report:verify`,
+                    () => persistReportFiles(gitRoot, initialFiles, false),
+                    { volatile: true },
+                );
+                reportInfo = { ...reportInfo, written: verified };
+            } catch (error) {
+                return {
+                    ok: false,
+                    status: "needs_user_decision",
+                    question,
+                    error: `the report changed on disk after it was fact-checked: ${error.message}`,
+                    outputs,
+                    claims,
+                    coverage: finalCoverage,
+                    report: reportInfo,
+                    factcheck,
+                };
+            }
+            return success("complete");
+        }
+
+        // One correction pass, never re-checked (the call ceiling allows exactly one).
+        const correctionPrompt =
+            `Question:\n${question}\n\nDate: ${paths.date}\n\n` +
+            `Correct this already-written report so that every finding below is fixed. Make the smallest edit that fixes ` +
+            `each finding. Preserve the recommendation and the evidence labels, introduce no unsupported facts, keep the ` +
+            `refuters' corrected grades, and leave everything else (including nits) unchanged. Return the complete revised ` +
+            `files and a receipt on the same template as before.\n\n` +
+            `Existing Markdown (exact):\n${initialFiles[0].content}\n\n` +
+            `Existing HTML (exact):\n${wantHtml ? initialFiles[1].content : "(not requested; return html as null)"}\n\n` +
+            `Existing receipt:\n${report.receipt}\n\n` +
+            `Findings to correct (JSON):\n${JSON.stringify(classified.actionable)}\n\n` +
+            `Report path (for the receipt only; you write nothing): ${paths.markdownPath}\n` +
+            `HTML companion: ${wantHtml ? `requested (${paths.htmlPath})` : "not requested; return html as null"}`;
+        const correctionRaw = await ctx.step(`${STEP_VERSION}:report:correction`, async () => {
+            const result = await ctx.agent(correctionPrompt, {
+                label: "neo-arc-assessment: report correction",
+                agent: AGENTS.report,
+                schema: REPORT_SCHEMA,
+            });
+            return result ?? null;
+        });
+        const revised = validateReportResult(correctionRaw, wantHtml);
+        if (!revised.ok) return fail("correction", `report correction failed: ${revised.error}`, { report: reportInfo, factcheck });
+        const revisedFiles = [{ relPath: paths.markdownPath, content: ensureTrailingNewline(revised.markdown) }];
+        if (wantHtml) revisedFiles.push({ relPath: paths.htmlPath, content: ensureTrailingNewline(revised.html) });
+        if (revisedFiles.every((f, i) => f.content === initialFiles[i].content)) {
+            return fail("correction", "report correction returned unchanged files despite actionable findings", {
+                report: reportInfo,
+                factcheck,
+            });
+        }
+        try {
+            const replaced = await ctx.step(
+                `${STEP_VERSION}:report:replace`,
+                () => replaceReportFiles(gitRoot, initialFiles, revisedFiles),
+                // Always re-check the disk on resume; replacement is a compare-and-swap and idempotent.
+                { volatile: true },
+            );
+            reportInfo = { ...reportInfo, written: replaced, receipt: revised.receipt };
+        } catch (error) {
+            return {
+                ok: false,
+                status: "needs_user_decision",
+                question,
+                error: `report correction was not written (the file on disk was preserved): ${error.message}`,
+                outputs,
+                claims,
+                coverage: finalCoverage,
+                report: reportInfo,
+                factcheck,
+                revision: { markdown: revisedFiles[0].content, html: wantHtml ? revisedFiles[1].content : null },
+            };
+        }
+        outputs.report = revised.receipt;
+        return success("corrected");
     },
 });
 

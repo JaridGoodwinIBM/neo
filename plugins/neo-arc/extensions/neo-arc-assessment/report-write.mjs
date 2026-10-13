@@ -178,3 +178,74 @@ export async function persistReportFiles(root, files, overwrite) {
     }
     return status;
 }
+
+/**
+ * Replace previously persisted report files with revised content under a compare-and-swap precondition.
+ * `previousFiles` and `revisedFiles` must name the same unique set of paths. Each file on disk must be a regular,
+ * non-symlink file whose content equals either the previous content (it is replaced) or the revised content
+ * (already replaced: a no-op, which makes a resume after a partial commit idempotent). Anything else — missing,
+ * externally edited, symlink, non-regular file — throws and nothing external is overwritten. Content is rechecked
+ * immediately before each rename, which narrows but does not close the race, and the concurrent-parent-symlink
+ * race documented on stage()/commit() remains (path strings, not directory handles). This is not atomic across files.
+ * @returns {Promise<Record<string, "overwritten" | "unchanged">>} status per relPath
+ */
+export async function replaceReportFiles(root, previousFiles, revisedFiles) {
+    const previous = new Map(previousFiles.map((f) => [f.relPath, f.content]));
+    const revised = new Map(revisedFiles.map((f) => [f.relPath, f.content]));
+    if (previous.size !== previousFiles.length || revised.size !== revisedFiles.length) {
+        throw new Error("duplicate report paths in the replacement");
+    }
+    if (previous.size !== revised.size || [...previous.keys()].some((p) => !revised.has(p))) {
+        throw new Error("previous and revised report path sets differ");
+    }
+
+    const readCurrent = async (relPath) => {
+        assertContained(root, relPath);
+        const { dir, exists } = await walkParents(root, relPath, false);
+        const dest = path.join(dir, path.basename(relPath));
+        const stat = exists ? await lstatOrNull(dest) : null;
+        if (stat === null) throw new Error(`report file is missing: ${relPath}`);
+        if (stat.isSymbolicLink()) throw new Error(`refusing symlink destination: ${relPath}`);
+        if (!stat.isFile()) throw new Error(`destination exists and is not a regular file: ${relPath}`);
+        return fs.readFile(dest, "utf8");
+    };
+    const classify = async (relPath) => {
+        const current = await readCurrent(relPath);
+        if (current === revised.get(relPath)) return "unchanged";
+        if (current === previous.get(relPath)) return "replace";
+        throw new Error(`report file changed outside the workflow; refusing to overwrite it: ${relPath}`);
+    };
+
+    const actions = new Map();
+    for (const relPath of revised.keys()) actions.set(relPath, await classify(relPath));
+
+    const staged = new Map();
+    const status = {};
+    try {
+        for (const [relPath, action] of actions) {
+            if (action === "replace") staged.set(relPath, await stage(root, { relPath, content: revised.get(relPath) }));
+        }
+        for (const [relPath, action] of actions) {
+            if (action === "unchanged") {
+                status[relPath] = "unchanged";
+                continue;
+            }
+            try {
+                // Recheck right before the swap: only still-previous content may be replaced.
+                if ((await classify(relPath)) === "unchanged") {
+                    status[relPath] = "unchanged";
+                    continue;
+                }
+                await fs.rename(staged.get(relPath).temp, staged.get(relPath).dest);
+                status[relPath] = "overwritten";
+            } catch (error) {
+                const done = Object.entries(status).map(([p, s]) => `${p} (${s})`);
+                const partial = done.length > 0 ? `; already persisted: ${done.join(", ")}` : "";
+                throw new Error(`${error.message}${partial}`);
+            }
+        }
+    } finally {
+        for (const { temp } of staged.values()) await fs.rm(temp, { force: true });
+    }
+    return status;
+}

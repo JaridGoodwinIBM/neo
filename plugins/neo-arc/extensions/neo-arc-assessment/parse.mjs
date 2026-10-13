@@ -1,6 +1,12 @@
 // Narrow section/table parsing for neo-arc worker templates. No SDK, no I/O.
 // This is deliberately not a Markdown parser: it knows `##` sections, one pipe table, and a first-word value.
-import { REUSE_GRADES } from "./helpers.mjs";
+import {
+    FACTCHECK_COLUMNS,
+    FACTCHECK_IMPACTS,
+    FACTCHECK_KINDS,
+    FACTCHECK_SEVERITIES,
+    REUSE_GRADES,
+} from "./helpers.mjs";
 
 function headingMatches(text, name) {
     return text === name || (text.startsWith(name) && !/[A-Za-z0-9]/.test(text[name.length]));
@@ -150,4 +156,51 @@ export function parseRefuterVerdict(reply) {
         return { ok: false, error: `corrected grade must be one of ${REUSE_GRADES.join(", ")}, got "${correctedGrade}"` };
     }
     return { ok: true, verdict, confidence, correctedGrade };
+}
+
+/**
+ * Factcheck reply → validated, normalized findings. `expectedKind` is a key of FACTCHECK_KINDS.
+ * Requires the exact check kind, a non-empty `Checked`, and a `Findings` section holding only the table whose
+ * header is FACTCHECK_COLUMNS. An empty table (header + separator only) means no findings. Severity must be exactly
+ * error/warning/nit and Recommendation impact exactly yes/no/unclear; Claim, Problem, Evidence and Fix are required.
+ * @returns {{ ok: true, kind: string, checked: string, findings: { severity: string, file: string, claim: string, problem: string, evidence: string, recommendationImpact: string, fix: string }[] } | { ok: false, error: string }}
+ */
+export function parseFactcheck(reply, expectedKind) {
+    if (!Object.hasOwn(FACTCHECK_KINDS, expectedKind)) return { ok: false, error: `unknown check kind "${expectedKind}"` };
+    const expected = FACTCHECK_KINDS[expectedKind];
+    const kindText = sectionText(reply, "Check kind");
+    if (kindText === null || kindText.toLowerCase() !== expected) {
+        return { ok: false, error: `check kind must be exactly "${expected}", got "${kindText ?? ""}"` };
+    }
+    const checked = sectionText(reply, "Checked");
+    if (!checked) return { ok: false, error: '"Checked" section is empty' };
+    const lines = sectionLines(reply, "Findings");
+    if (lines === null) return { ok: false, error: 'section "Findings" is missing' };
+    if (lines.some((l) => l.trim() !== "" && !l.trim().startsWith("|"))) {
+        return { ok: false, error: '"Findings" must contain only the findings table' };
+    }
+    let seenBlankAfterTable = false;
+    let started = false;
+    for (const l of lines) {
+        if (l.trim() === "") seenBlankAfterTable = started;
+        else if (seenBlankAfterTable) return { ok: false, error: '"Findings" must contain a single contiguous table' };
+        else started = true;
+    }
+    const table = parseTable(reply, "Findings", FACTCHECK_COLUMNS);
+    if (!table.ok) return table;
+    const findings = [];
+    for (const [i, cells] of table.rows.entries()) {
+        const [severity, file, claim, problem, evidence, impact, fix] = cells;
+        if (!FACTCHECK_SEVERITIES.includes(severity)) {
+            return { ok: false, error: `finding ${i + 1} severity must be exactly error, warning or nit, got "${severity}"` };
+        }
+        if (!FACTCHECK_IMPACTS.includes(impact)) {
+            return { ok: false, error: `finding ${i + 1} recommendation impact must be exactly yes, no or unclear, got "${impact}"` };
+        }
+        for (const [name, value] of [["claim", claim], ["problem", problem], ["evidence", evidence], ["fix", fix]]) {
+            if (value === "") return { ok: false, error: `finding ${i + 1} has an empty ${name}` };
+        }
+        findings.push({ severity, file, claim, problem, evidence, recommendationImpact: impact, fix });
+    }
+    return { ok: true, kind: expected, checked, findings };
 }

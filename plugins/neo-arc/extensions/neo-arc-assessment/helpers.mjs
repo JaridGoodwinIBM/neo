@@ -47,6 +47,46 @@ export const TEMPLATES = {
     factcheck: ["Check kind", "Checked", "Findings"],
 };
 
+/** Factcheck check kinds, keyed by the stable item id; the value is the exact `## Check kind` text. */
+export const FACTCHECK_KINDS = {
+    "repository-facts": "repository facts",
+    "external-claims": "external claims",
+    "document-structure": "document structure",
+};
+
+/** Exact column header of the Factcheck `## Findings` table. */
+export const FACTCHECK_COLUMNS = ["Severity", "File", "Claim", "Problem", "Evidence", "Recommendation impact", "Fix"];
+
+export const FACTCHECK_SEVERITIES = ["error", "warning", "nit"];
+
+/** `yes`/`unclear`: applying the finding without user input could change the recommended shape or a decision gate. */
+export const FACTCHECK_IMPACTS = ["yes", "no", "unclear"];
+
+/**
+ * Deterministically classify normalized Factcheck findings.
+ * `blocking` = any finding (even a nit) whose impact is `yes` or `unclear`: it needs a user decision and must not be
+ * auto-applied. `actionable` = error/warning findings with impact `no`. `nits` = nit findings with impact `no`.
+ * `recommendationImpact` is the overall worst case: `yes`, else `unclear`, else `no`.
+ */
+export function classifyFindings(findings) {
+    const counts = { error: 0, warning: 0, nit: 0 };
+    const blocking = [];
+    const actionable = [];
+    const nits = [];
+    for (const f of findings) {
+        counts[f.severity] += 1;
+        if (f.recommendationImpact !== "no") blocking.push(f);
+        else if (f.severity === "nit") nits.push(f);
+        else actionable.push(f);
+    }
+    const recommendationImpact = findings.some((f) => f.recommendationImpact === "yes")
+        ? "yes"
+        : findings.some((f) => f.recommendationImpact === "unclear")
+          ? "unclear"
+          : "no";
+    return { counts, recommendationImpact, blocking, actionable, nits };
+}
+
 /**
  * Validate and normalize the design question.
  * @returns {{ ok: true, question: string } | { ok: false, error: string }}

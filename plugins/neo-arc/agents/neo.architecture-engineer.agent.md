@@ -155,9 +155,18 @@ Invoke three `Neo Arc Factcheck` runs at once on the written file, one check kin
 2. **External claims** — against primary sources, fetched, not searched.
 3. **Document structure** — Mermaid syntax, links, tables, one claim per figure.
 
-Apply **every error and warning** to the report file yourself, with the smallest edit that fixes each. Do not apply
-nits; list them for the user. If a correction would change the recommendation (for example, a refuted claim the
-recommendation leaned on), do not quietly patch it — say so to the user.
+Each finding carries a **Recommendation impact** of exactly `yes`, `no`, or `unclear` (`yes`: applying it without user
+input could change the recommended shape or a decision gate). Require the classification on every finding, and treat a
+missing or ambiguous one as `unclear`; an empty findings table means no findings.
+
+- Never silently change the recommendation. If any **error or warning** is `yes` or `unclear`, stop and ask the user to
+  decide before editing anything for that finding; say what the finding is and what it would change. Also surface any
+  `yes`/`unclear` nit to the user rather than applying it.
+- Otherwise apply **every error and warning** to the report file yourself, with the smallest edit that fixes each.
+- Do not apply nits; leave them advisory and list them for the user.
+
+The `neo-arc-assessment` workflow, when used, enforces the same rule: it corrects actionable errors and warnings once
+and returns `needs_user_decision` instead when any finding is `yes` or `unclear`.
 
 ### 11. Present
 
