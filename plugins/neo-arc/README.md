@@ -57,7 +57,7 @@ The method's design record is
 | `neo.arc-synthesizer.agent.md` | `Neo Arc Synthesizer` | Phased recommendation and its load-bearing reuse claims (max 16) | 1 |
 | `neo.arc-refuter.agent.md` | `Neo Arc Refuter` | Tries to break one reuse claim; returns a corrected grade | one per claim, parallel |
 | `neo.arc-critic.agent.md` | `Neo Arc Critic` | Completeness critique and the sharpest question | 1 |
-| `neo.arc-report.agent.md` | `Neo Arc Report` | Writes the report, carrying the refuters' corrected grades | 1 |
+| `neo.arc-report.agent.md` | `Neo Arc Report` | Returns the report content (no file writes), carrying the refuters' corrected grades | 1 |
 | `neo.arc-factcheck.agent.md` | `Neo Arc Factcheck` | Checks the written report for one check kind | 3, parallel |
 
 Angles and lenses are passed in the prompt, not baked into separate agent files, so the same files serve every

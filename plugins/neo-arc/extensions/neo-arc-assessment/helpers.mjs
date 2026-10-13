@@ -179,3 +179,113 @@ export function propagateGrades(claims, refuted) {
         };
     });
 }
+
+/** The only repo-relative directory a report may be written under. */
+export const ASSESSMENT_DIR = "docs/design/assessments";
+
+const ARG_FIELDS = ["question", "outputPath", "html", "overwrite"];
+
+/**
+ * Validate a repo-relative report path. Pure string policy: forward-slash relative path, no `.`/`..`/empty
+ * segments, no control characters or backslashes, under ASSESSMENT_DIR, ending in a non-empty `.md` name.
+ * @returns {{ ok: true, path: string } | { ok: false, error: string }}
+ */
+export function validateOutputPath(value) {
+    if (typeof value !== "string") return { ok: false, error: "outputPath must be a string" };
+    if (value === "" || value.trim() !== value) return { ok: false, error: "outputPath must be non-empty with no surrounding whitespace" };
+    if (/[\u0000-\u001f\u007f\\]/.test(value)) {
+        return { ok: false, error: "outputPath must use forward slashes and contain no control characters" };
+    }
+    if (value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
+        return { ok: false, error: "outputPath must be repo-relative, not absolute" };
+    }
+    const segments = value.split("/");
+    if (segments.some((s) => s === "" || s === "." || s === "..")) {
+        return { ok: false, error: 'outputPath must not contain empty, "." or ".." segments' };
+    }
+    if (!value.startsWith(`${ASSESSMENT_DIR}/`)) {
+        return { ok: false, error: `outputPath must be under ${ASSESSMENT_DIR}/` };
+    }
+    const base = segments[segments.length - 1];
+    if (!base.endsWith(".md") || base === ".md") {
+        return { ok: false, error: "outputPath must name a Markdown file ending in .md" };
+    }
+    return { ok: true, path: value };
+}
+
+/** Lowercase ASCII kebab slug of the question's leading words, never empty. */
+export function slugifyTopic(question, maxLength = 60) {
+    const words = String(question)
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .split(" ")
+        .filter(Boolean);
+    let slug = "";
+    for (const word of words.slice(0, 8)) {
+        const next = slug === "" ? word : `${slug}-${word}`;
+        if (next.length > maxLength) break;
+        slug = next;
+    }
+    if (slug === "") slug = words[0] ? words[0].slice(0, maxLength) : "architecture";
+    return slug;
+}
+
+/** `docs/design/assessments/<YYYY-MM-DD>-<slug>-assessment.md` */
+export function deriveReportPath(question, isoDate) {
+    return `${ASSESSMENT_DIR}/${isoDate}-${slugifyTopic(question)}-assessment.md`;
+}
+
+/** Sibling `.html` of a validated `.md` report path. */
+export function htmlCompanionPath(markdownPath) {
+    return markdownPath.replace(/\.md$/, ".html");
+}
+
+/**
+ * Validate the whole workflow args object: wrong types, unknown fields, and the output path policy.
+ * @returns {{ ok: true, question: string, outputPath: string | null, html: boolean, overwrite: boolean } | { ok: false, error: string }}
+ */
+export function validateReportArgs(args) {
+    if (args === null || typeof args !== "object" || Array.isArray(args)) {
+        return { ok: false, error: "args must be an object" };
+    }
+    const unknown = Object.keys(args).filter((k) => !ARG_FIELDS.includes(k));
+    if (unknown.length > 0) return { ok: false, error: `unknown args field(s): ${unknown.join(", ")}` };
+    const q = normalizeQuestion(args.question);
+    if (!q.ok) return q;
+    for (const key of ["html", "overwrite"]) {
+        if (args[key] !== undefined && typeof args[key] !== "boolean") {
+            return { ok: false, error: `${key} must be a boolean` };
+        }
+    }
+    let outputPath = null;
+    if (args.outputPath !== undefined) {
+        const p = validateOutputPath(args.outputPath);
+        if (!p.ok) return p;
+        outputPath = p.path;
+    }
+    return { ok: true, question: q.question, outputPath, html: args.html === true, overwrite: args.overwrite === true };
+}
+
+/**
+ * Validate the report worker's structured result (content only). The receipt must match TEMPLATES.report.
+ * @returns {{ ok: true, markdown: string, html: string | null, receipt: string } | { ok: false, error: string }}
+ */
+export function validateReportResult(result, htmlRequested) {
+    if (result === null || typeof result !== "object" || Array.isArray(result)) {
+        return { ok: false, error: "report worker returned no structured result" };
+    }
+    const { markdown, html, receipt } = result;
+    if (typeof markdown !== "string" || markdown.trim() === "") {
+        return { ok: false, error: "report markdown is empty" };
+    }
+    if (htmlRequested && (typeof html !== "string" || html.trim() === "")) {
+        return { ok: false, error: "report html was requested but is empty" };
+    }
+    if (typeof receipt !== "string") return { ok: false, error: "report receipt must be a string" };
+    const check = checkTemplate(receipt, TEMPLATES.report);
+    if (!check.ok) return { ok: false, error: `report receipt is off template: ${check.problems.join("; ")}` };
+    return { ok: true, markdown, html: htmlRequested ? html : null, receipt };
+}

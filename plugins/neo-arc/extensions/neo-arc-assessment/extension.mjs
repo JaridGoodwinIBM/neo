@@ -3,11 +3,14 @@ import {
     REUSE_GRADES,
     TEMPLATES,
     checkTemplate,
+    deriveReportPath,
+    htmlCompanionPath,
     nextAttempt,
-    normalizeQuestion,
     propagateGrades,
     startAttempt,
     summarizeCoverage,
+    validateReportArgs,
+    validateReportResult,
 } from "./helpers.mjs";
 import {
     parseAreas,
@@ -16,6 +19,7 @@ import {
     parseReuseClaims,
     sectionText,
 } from "./parse.mjs";
+import { findGitRoot, persistReportFiles, preflightReportFiles } from "./report-write.mjs";
 
 const AGENTS = {
     scout: "neo-arc:neo.arc-scout",
@@ -25,14 +29,25 @@ const AGENTS = {
     synthesizer: "neo-arc:neo.arc-synthesizer",
     refuter: "neo-arc:neo.arc-refuter",
     critic: "neo-arc:neo.arc-critic",
+    report: "neo-arc:neo.arc-report",
 };
 
 const STEP_VERSION = "assessment-v1";
 const MAX_REFUTERS = 16;
-// 1 Scout + up to 12 Readers (11 areas + external) + 3 Designers + 3 Judges + 1 Synthesizer + 16 Refuters + 1 Critic = 37
-// logical calls, each with at most one manual retry.
-const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1;
+// 1 Scout + up to 12 Readers (11 areas + external) + 3 Designers + 3 Judges + 1 Synthesizer + 16 Refuters + 1 Critic
+// + 1 Report = 38 logical calls, each with at most one retry (manual for template workers, the SDK schema retry for Report).
+const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1 + 1;
 const MAX_TOTAL_SUBAGENTS = MAX_LOGICAL_CALLS * 2;
+
+const REPORT_SCHEMA = {
+    type: "object",
+    required: ["markdown", "html", "receipt"],
+    properties: {
+        markdown: { type: "string" },
+        html: { type: ["string", "null"] },
+        receipt: { type: "string" },
+    },
+};
 
 const DESIGNER_ANGLES = [
     {
@@ -115,17 +130,23 @@ const acceptedOutputs = (results) =>
             .map(([id, r]) => [id, r.output]),
     );
 
+const ensureTrailingNewline = (text) => (text.endsWith("\n") ? text : `${text}\n`);
+
 const neoArcAssessment = defineWorkflow({
     meta: {
         name: "neo-arc-assessment",
         description:
             "Explicit-only: run only when the user asks for the neo-arc-assessment workflow by name. " +
-            "Partial Neo Arc assessment, Scout through Critic (no Report or Factcheck, no files written): " +
-            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic. " +
-            "Call ceiling: at most 37 logical calls (1 Scout + up to 12 Readers + 3 Designers + 3 Judges + 1 Synthesizer + " +
-            "16 Refuters + 1 Critic), each with at most one manual retry = 74 subagent attempts (maxTotalSubagents). " +
+            "Partial Neo Arc assessment, Scout through Report (no Factcheck): " +
+            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic → Report. " +
+            "The workflow itself writes the report Markdown (and an optional sibling HTML) under docs/design/assessments/; " +
+            "the Report worker returns content only. " +
+            "Call ceiling: at most 38 logical calls (1 Scout + up to 12 Readers + 3 Designers + 3 Judges + 1 Synthesizer + " +
+            "16 Refuters + 1 Critic + 1 Report), each with at most one retry = 76 subagent attempts (maxTotalSubagents). " +
             "No AI-credit estimate is made. " +
-            "args: { question: string } — the architecture design question.",
+            "args: { question: string, outputPath?: string (repo-relative .md under docs/design/assessments/; default " +
+            "docs/design/assessments/<YYYY-MM-DD>-<topic-slug>-assessment.md), html?: boolean (default false; sibling .html), " +
+            "overwrite?: boolean (default false; replace a different existing file) }.",
         phases: [
             { title: "Scout" },
             { title: "Readers" },
@@ -134,20 +155,45 @@ const neoArcAssessment = defineWorkflow({
             { title: "Synthesizer" },
             { title: "Refuters" },
             { title: "Critic" },
+            { title: "Report" },
         ],
         argsSchema: {
             type: "object",
             required: ["question"],
             properties: {
                 question: { type: "string" },
+                outputPath: { type: "string" },
+                html: { type: "boolean" },
+                overwrite: { type: "boolean" },
             },
         },
         limits: { maxTotalSubagents: MAX_TOTAL_SUBAGENTS },
     },
     run: async (ctx) => {
-        const q = normalizeQuestion(ctx.args?.question);
-        if (!q.ok) return { ok: false, error: q.error };
-        const question = q.question;
+        const parsedArgs = validateReportArgs(ctx.args);
+        if (!parsedArgs.ok) return { ok: false, error: parsedArgs.error };
+        const { question, html: wantHtml, overwrite } = parsedArgs;
+
+        // Resolve and pre-check the destination before spending any subagent calls. The date is journaled so a
+        // resumed run derives the same path.
+        const paths = await ctx.step(`${STEP_VERSION}:report:paths`, async () => {
+            const date = new Date().toISOString().slice(0, 10);
+            const markdownPath = parsedArgs.outputPath ?? deriveReportPath(question, date);
+            return { date, markdownPath, htmlPath: wantHtml ? htmlCompanionPath(markdownPath) : null };
+        });
+        let gitRoot;
+        try {
+            gitRoot = await findGitRoot(process.cwd());
+            // Content is unknown yet, so this only proves containment and rejects symlinks; the content-aware
+            // conflict check runs at write time (an existing identical file is a valid resume).
+            await preflightReportFiles(
+                gitRoot,
+                [paths.markdownPath, paths.htmlPath].filter(Boolean).map((relPath) => ({ relPath, content: "" })),
+                true,
+            );
+        } catch (error) {
+            return { ok: false, error: `report destination rejected: ${error.message}` };
+        }
 
         const outputs = {};
         const stages = {}; // role -> { requested: string[], results: Record<id, result> }
@@ -355,7 +401,53 @@ const neoArcAssessment = defineWorkflow({
         if (critic.status !== "accepted") return fail("critic", failureText("critic", critic));
         outputs.critic = critic.output;
 
-        return { ok: true, question, outputs, claims, coverage: buildCoverage() };
+        // Report: the worker returns content only; this workflow alone writes the files.
+        ctx.phase("Report");
+        const coverage = buildCoverage();
+        const reportPrompt =
+            `Question:\n${question}\n\nDate: ${paths.date}\n\n` +
+            `Synthesis:\n${outputs.synthesizer}\n\nRefuter verdicts paired with their claims:\n${pairedVerdicts || "(no reuse claims)"}\n\n` +
+            `Critique:\n${outputs.critic}\n\nRun log (JSON):\n${JSON.stringify(coverage)}\n\n` +
+            `Report path (for the receipt only; you write nothing): ${paths.markdownPath}\n` +
+            `HTML companion: ${wantHtml ? `requested (${paths.htmlPath})` : "not requested; return html as null"}`;
+        // The schema call's own single retry is the only retry the Report worker gets.
+        const reportRaw = await ctx.step(`${STEP_VERSION}:report:content`, async () => {
+            const result = await ctx.agent(reportPrompt, {
+                label: "neo-arc-assessment: report",
+                agent: AGENTS.report,
+                schema: REPORT_SCHEMA,
+            });
+            return result ?? null;
+        });
+        const report = validateReportResult(reportRaw, wantHtml);
+        if (!report.ok) return fail("report", `report failed: ${report.error}`);
+        outputs.report = report.receipt;
+
+        const files = [{ relPath: paths.markdownPath, content: ensureTrailingNewline(report.markdown) }];
+        if (wantHtml) files.push({ relPath: paths.htmlPath, content: ensureTrailingNewline(report.html) });
+        let written;
+        try {
+            written = await ctx.step(`${STEP_VERSION}:report:write`, () => persistReportFiles(gitRoot, files, overwrite), {
+                // Always re-check the disk on resume; the write itself is idempotent.
+                volatile: true,
+            });
+        } catch (error) {
+            return fail("report", `report write failed: ${error.message}`);
+        }
+
+        return {
+            ok: true,
+            question,
+            outputs,
+            claims,
+            coverage,
+            report: {
+                path: paths.markdownPath,
+                htmlPath: paths.htmlPath,
+                written,
+                receipt: report.receipt,
+            },
+        };
     },
 });
 
