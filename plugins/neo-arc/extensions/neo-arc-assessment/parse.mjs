@@ -137,7 +137,8 @@ export function parseReuseClaims(reply) {
  * @returns {{ ok: true, verdict: string, confidence: string, correctedGrade: string } | { ok: false, error: string }}
  */
 export function parseRefuterVerdict(reply) {
-    const first = (name) => normalizeToken((sectionText(reply, name) ?? "").split(/\r?\n/)[0] ?? "");
+    // First whitespace-delimited token; same-line prose and trailing punctuation after it are ignored.
+    const first = (name) => normalizeToken(((sectionText(reply, name) ?? "").split(/\s+/)[0] ?? "")).replace(/[,:;!?()[\]\s]+$/, "");
     const verdict = first("Verdict");
     const confidence = first("Confidence");
     const correctedGrade = first("Corrected grade");
