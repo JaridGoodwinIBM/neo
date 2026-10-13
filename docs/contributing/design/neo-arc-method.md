@@ -231,6 +231,25 @@ changed is the packaging, to conform to Neo's contracts. Each row names the rule
 | "Runs from VS Code" | Runs in Copilot CLI and VS Code: workers are subagents invoked by the orchestrator at depth 1, so no host (desktop-app) tools are needed | [`agent-authoring-reference.md`](../guides/agent-authoring-reference.md) § Agents and subagents |
 | Models unspecified | Orchestrator `HydraFusion` with Opus/Astra fallbacks and no pinned reasoning effort; designer and synthesizer `Claude Opus 5.5` / `high`; judge, refuter, critic, and fact-checker `Claude Sonnet 5.5` / `high`; scout and reader `Claude Sonnet 5.5` / `medium`; report writer `Claude Haiku 5.5` / `medium` | [`agent-authoring-reference.md`](../guides/agent-authoring-reference.md) § Model selection — use routing for the whole loop, retain stronger models where errors are expensive to detect, and spend less on bounded output that is immediately checked |
 
+### Optional Dynamic Workflow route
+
+Beside the conversational orchestrator, `neo-arc` ships a registered Copilot Dynamic Workflow, `neo-arc-assessment`,
+in `plugins/neo-arc/extensions/neo-arc-assessment/extension.mjs` (declared by `plugin.json` `extensions`). It is
+explicit-only — it runs only when asked for by name, never automatically — and it reuses the same nine worker agents
+rather than redefining them. The pipeline is a script instead of orchestrator prose, so these differ from the
+conversational route:
+
+- The workflow, not the Report worker, writes the report (and an optional sibling HTML). The Report worker returns
+  content only. The destination is checked before any worker runs, and an existing different file is replaced only
+  with `overwrite`.
+- Worker replies are validated against the templates in code, with one retry; the refuter cap (16) is enforced in code.
+- Fact-checking runs three checkers, then at most one correction Report call. Findings whose impact is `yes` or
+  `unclear` return `needs_user_decision` and are not applied.
+- The call ceiling is 42 logical calls, 84 attempts with retries (`maxTotalSubagents`); no AI-credit estimate is made.
+
+The conversational Neo Architecture Engineer stays the default entry point. Workflow invocation was verified on
+Copilot CLI 1.0.97 (an invalid question rejected before any worker ran); the full flow has not been live-tested.
+
 The run figures in [Purpose](#purpose) and [Adaptations and constraints](#adaptations-and-constraints) — agents per run,
 token counts, the share of reuse claims downgraded, the reader schema-failure rate — are the source author's
 observations from one repository. They are not measured in Neo; treat them as sizing guidance, not as a baseline.

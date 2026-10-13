@@ -77,6 +77,7 @@ failing to load**.
 | `plugin.json`                        | Plugin metadata (name, version, author, keywords, …) plus the `agents`/`skills`/`hooks` paths.  |
 | `agents/`                            | Subagent definitions, one dotted `neo.<role>.agent.md` file per role.                            |
 | `skills/`                            | Agent Skills, e.g. `neo-task-authoring/SKILL.md`.                                                |
+| `extensions/<name>/extension.mjs`    | Optional. Extension packages, declared by `plugin.json` `extensions` (e.g. `neo-arc`'s `neo-arc-assessment`, which registers an explicit-only Dynamic Workflow). Each declared directory must hold at least one child package with an `extension.mjs` entry; the validator fails otherwise. Helper modules and tests may sit beside it. |
 | `hooks/hooks.json`                   | Lifecycle-logging hooks, Copilot event names, `${PLUGIN_ROOT}`, versioned schema (`"version": 1`). A shipped manifest registers no fail-closed event. |
 | `hooks/scripts/log-event.sh`         | The observability logger `hooks.json` shells out to (fail-open). See [observability.md](../guides/observability.md). |
 | `hooks/scripts/enforce-guardrails.sh` | The opt-in `preToolUse` enforcement hook on Unix (fail-closed): blocks commit/push to `main` and non-draft PRs. Shipped but **not** wired by `hooks.json`; a consuming repo opts in. A `.ps1` sibling covers Windows. See [enforcement.md](../guides/enforcement.md). |
@@ -130,6 +131,7 @@ their own values.
 | `agents`      | `"agents/"`                                      | Optional; defaults to `agents/`. | Required — declared explicitly even though it matches the default. |
 | `skills`      | `"skills/"`                                      | Optional; defaults to `skills/`. | Required — declared explicitly even though it matches the default. |
 | `hooks`       | `"hooks/hooks.json"`                             | Optional; no default. | Required whenever the plugin ships hooks. |
+| `extensions`  | `"extensions/"` (`neo-arc` only)                 | Optional.   | Declare it whenever the plugin ships extensions; the path must resolve to a directory of packages each with an `extension.mjs`. |
 
 **Why declare paths that match the default.** Relying on an implicit default is what hid the
 skills bug: the key was simply absent, so nothing looked wrong in review. Declaring all three

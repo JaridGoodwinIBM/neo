@@ -38,6 +38,7 @@ plugins/neo-arc/                     The Architecture Assessment loop — same s
   plugin.json                        Copilot plugin manifest
   agents/                            neo.arc-<role>.agent.md
   skills/                            its own copy of neo-evidence-standard
+  extensions/neo-arc-assessment/     optional explicit-only Dynamic Workflow — extension.mjs (declared by plugin.json "extensions")
   hooks/hooks.json                   Copilot hook config (v1 schema, ${PLUGIN_ROOT})
   hooks/scripts/log-event.sh         its own copy — plugins can't share files
 .github/plugin/marketplace.json      Copilot marketplace (root, lists plugins[])
@@ -84,7 +85,7 @@ This repo has nothing to compile, lint, or unit-test in the app sense. Do **not*
 - **Plugins validate** — run `python3 scripts/validate-plugins.py` (`uv run scripts/validate-plugins.py`
   where `python3` isn't on PATH, e.g. Windows). It walks every
   `plugins/*/`, checks the Copilot manifest + hooks parse, asserts every declared component
-  path (`agents`, `skills`, `hooks`) resolves to something real on disk, validates each
+  path (`agents`, `skills`, `hooks`, `extensions`) resolves to something real on disk, validates each
   `hooks.json` against the hook-manifest contract (`scripts/linting/schemas/hook-manifest.schema.json`
   — including the rule that a `powershell` command must use `$env:PLUGIN_ROOT`, not the
   bare `${PLUGIN_ROOT}`), rejects non-canonical hook event names, and fails on any `agents:`

@@ -43,6 +43,32 @@ The method's design record is
   `docs/design/assessments/<YYYY-MM-DD>-<topic>-assessment.md`. Never staged or committed by the loop.
 - **Follow-ups** re-enter at the scout with two to four areas, using the earlier evidence map as context, not evidence.
 
+## Two ways to run it
+
+| Route | How | When |
+| --- | --- | --- |
+| **Conversational** | Select **Neo Architecture Engineer** as your session agent and state the question. | The default. It can ask you to pin down an ambiguous word, and you can ask follow-ups in the same session. |
+| **Dynamic Workflow** | Run the registered `neo-arc-assessment` workflow by name (below). | When you want the same stages run as one scripted, bounded workflow. |
+
+The workflow is **explicit-only**: it never runs automatically and is not chosen on your behalf; it runs only when
+you ask for it by name. The plugin must be installed and enabled, and Copilot CLI may prompt you to trust or
+configure the packaged extension.
+
+```
+copilot --experimental workflow run neo-arc-assessment --args '{"question":"..."}'
+```
+
+Optional args: `outputPath` (repo-relative `.md` under `docs/design/assessments/`), `html` (boolean, default
+`false`; writes a sibling `.html`), and `overwrite` (boolean, default `false`; replace a different existing file).
+The workflow itself writes the report — the Report worker returns content only — and a destination that escapes the
+repository or collides with a different existing file is rejected before any worker runs. It ends with the same
+Scout → Readers → Designers → Judges → Synthesizer → Refuters → Critic → Report → Factcheck stages, with at most
+one correction pass. A finding that could change the recommendation returns `needs_user_decision` instead of being
+applied. The call ceiling is 42 logical calls (84 attempts including one retry each); no cost estimate is made.
+
+> **Verification status.** Workflow invocation was checked on Copilot CLI 1.0.97: an invalid `question` is rejected
+> before any worker runs. A complete end-to-end run of the workflow has **not** been live-tested.
+
 ## What's inside
 
 **Agents** (`agents/`, `neo.<role>.agent.md`):
@@ -66,6 +92,11 @@ are put to the user) and the report writer edit, and only the report.
 
 The agents are **stack- and project-agnostic**. Layout, conventions, the reports folder, and the governing documents
 come from the consuming repo's `AGENTS.md`, ADRs, and PRDs — never baked into a prompt.
+
+**Extension** (`extensions/neo-arc-assessment/extension.mjs`, declared by `plugin.json` `extensions`): registers the
+`neo-arc-assessment` workflow. Its `helpers.mjs`, `parse.mjs`, and `report-write.mjs` modules and `*.test.mjs` files
+sit beside it. It calls the same agents above by their `neo-arc:` names, and it is separate from the conversational
+Neo Architecture Engineer.
 
 **Skills** (`skills/`):
 
