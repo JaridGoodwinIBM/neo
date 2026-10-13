@@ -74,7 +74,7 @@ failing to load**.
 
 | Path (within a plugin)               | Purpose                                                                                          |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| `plugin.json`                        | Plugin metadata (name, version, author, keywords, …) plus the `agents`/`skills`/`hooks` paths.  |
+| `plugin.json`                        | Plugin metadata (name, version, author, keywords, …) plus the component paths (`agents`, `skills`, `hooks`, `extensions`). |
 | `agents/`                            | Subagent definitions, one dotted `neo.<role>.agent.md` file per role.                            |
 | `skills/`                            | Agent Skills, e.g. `neo-task-authoring/SKILL.md`.                                                |
 | `extensions/<name>/extension.mjs`    | Optional. Extension packages, declared by `plugin.json` `extensions` (e.g. `neo-arc`'s `neo-arc-assessment`, which registers an explicit-only Dynamic Workflow). Each declared directory must hold at least one child package with an `extension.mjs` entry; the validator fails otherwise. Helper modules and tests may sit beside it. |
@@ -134,7 +134,7 @@ their own values.
 | `extensions`  | `"extensions/"` (`neo-arc` only)                 | Optional.   | Declare it whenever the plugin ships extensions; the path must resolve to a directory of packages each with an `extension.mjs`. |
 
 **Why declare paths that match the default.** Relying on an implicit default is what hid the
-skills bug: the key was simply absent, so nothing looked wrong in review. Declaring all three
+skills bug: the key was simply absent, so nothing looked wrong in review. Declaring every component path
 makes the contract legible in the manifest itself and gives the validator something to check
 against the filesystem.
 

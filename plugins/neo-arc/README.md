@@ -58,10 +58,15 @@ configure the packaged extension.
 copilot --experimental workflow run neo-arc-assessment --args '{"question":"..."}'
 ```
 
-Optional args: `outputPath` (repo-relative `.md` under `docs/design/assessments/`), `html` (boolean, default
+Optional args: `outputPath` (repo-relative `.md` under `docs/design/assessments/`; path segments may use only
+letters, digits, `.`, `_` and `-`), `html` (boolean, default
 `false`; writes a sibling `.html`), and `overwrite` (boolean, default `false`; replace a different existing file).
-The workflow itself writes the report — the Report worker returns content only — and a destination that escapes the
-repository or collides with a different existing file is rejected before any worker runs. It ends with the same
+The workflow itself writes the report — the Report worker returns content only. Before any worker runs it checks
+the `outputPath` value, that the destination stays inside the repository, and that it is not a symlink or a
+non-regular file. A collision with a different existing file is only detected at write time, after the workers have
+run, and fails unless `overwrite` is `true`. With `html`, the workflow rejects HTML containing scripts, event
+handlers, `javascript:` URLs, embedded elements or external resources; this is a best-effort check, not a
+sanitizer. It runs the same
 Scout → Readers → Designers → Judges → Synthesizer → Refuters → Critic → Report → Factcheck stages, with at most
 one correction pass. A finding that could change the recommendation returns `needs_user_decision` instead of being
 applied. The call ceiling is 42 logical calls (84 attempts including one retry each); no cost estimate is made.

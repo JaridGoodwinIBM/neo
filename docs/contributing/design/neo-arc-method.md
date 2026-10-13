@@ -240,8 +240,10 @@ rather than redefining them. The pipeline is a script instead of orchestrator pr
 conversational route:
 
 - The workflow, not the Report worker, writes the report (and an optional sibling HTML). The Report worker returns
-  content only. The destination is checked before any worker runs, and an existing different file is replaced only
-  with `overwrite`.
+  content only. Before any worker runs, the workflow checks `outputPath` validity (including portable
+  filenames), containment in the repository, symlinks and non-regular files. A collision with a different existing
+  file is detected only at write time, after the workers have run, and fails unless `overwrite` is set. HTML with
+  active or external content is rejected by a best-effort check, not a sanitizer.
 - Worker replies are validated against the templates in code, with one retry; the refuter cap (16) is enforced in code.
 - Fact-checking runs three checkers, then at most one correction Report call. Findings whose impact is `yes` or
   `unclear` return `needs_user_decision` and are not applied.
