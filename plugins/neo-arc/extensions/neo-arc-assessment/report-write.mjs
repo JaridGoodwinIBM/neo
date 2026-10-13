@@ -79,7 +79,11 @@ async function plan(root, file, overwrite) {
     return "overwrite";
 }
 
-/** Write the content to a same-directory temp file (flags `wx`) after proving the parent is the validated real path. */
+/**
+ * Write the content to a same-directory temp file (flags `wx`) after proving the parent is the validated real path.
+ * This narrows the window; it does not defend against a concurrent local attacker swapping a parent directory for a
+ * symlink after this check, because the later link()/rename() calls use path strings, not directory handles.
+ */
 async function stage(root, file) {
     const { dir } = await walkParents(root, file.relPath, true);
     // Containment proof: the real parent directory is exactly where the validated path says it is.
@@ -103,9 +107,12 @@ async function stage(root, file) {
 }
 
 /**
- * Move a staged temp file into place according to the planned action, without a check-then-act window:
- * "create" uses link(), which fails with EEXIST instead of replacing; "overwrite" re-checks the destination
- * immediately before rename(). Returns the status actually achieved.
+ * Move a staged temp file into place according to the planned action: "create" uses link(), which fails with
+ * EEXIST instead of replacing (no check-then-act window for the destination file itself); "overwrite" does an
+ * lstat then rename(), where a swapped destination file is harmless because rename() replaces the link itself.
+ * Residual risk: a parent directory swapped to a symlink after stage()'s check is not defended against, since
+ * link()/rename() take path strings. Where link() is unsupported (e.g. Windows, some filesystems) create fails
+ * with an error; there is no fallback. Returns the status actually achieved.
  */
 async function commit(staged, file, action) {
     const { dest, temp } = staged;

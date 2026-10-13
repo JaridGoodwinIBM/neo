@@ -54,7 +54,8 @@ new ones you have not opened, and do not drop the `FACT` / `INFERENCE` / `RECALL
 ### HTML companion (only when requested)
 
 Compose a self-contained HTML document with the same content and figures drawn as inline SVG. No external scripts,
-fonts, or stylesheets. When it is not requested, the HTML is absent.
+fonts, or stylesheets. The caller checks it against a best-effort denylist in the workflow helper (`findActiveHtml`),
+which is not a sanitizer and does not make the HTML safe. When it is not requested, the HTML is absent.
 
 ## Evidence
 

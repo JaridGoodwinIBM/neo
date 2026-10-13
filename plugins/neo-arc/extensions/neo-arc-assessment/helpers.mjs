@@ -209,7 +209,7 @@ export function validateOutputPath(value) {
     // Portable names only: no `:` (NTFS alternate streams), spaces, or trailing dots; no Windows device names.
     for (const segment of segments) {
         if (!/^[A-Za-z0-9._-]+$/.test(segment) || segment.endsWith(".")) {
-            return { ok: false, error: "outputPath segments may contain only letters, digits, '.', '_' and '-', and must not end in '.'" };
+            return { ok: false, error: `outputPath segment "${segment}" is invalid: segments may contain only letters, digits, '.', '_' and '-', and must not end in '.'` };
         }
         if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(segment)) {
             return { ok: false, error: `outputPath must not use a reserved device name: ${segment}` };
@@ -281,6 +281,8 @@ export function validateReportArgs(args) {
 /**
  * Reject active or external content in a report HTML document. Deterministic substring/regex policy:
  * no scripts, event handlers, javascript: URLs, embedding elements, meta refresh, or external resources.
+ * This is a best-effort denylist, not a sanitizer: it does not decode entities (e.g. `javascript&colon;` passes)
+ * and passing it is no guarantee the HTML is safe.
  * @returns {string | null} a description of the first violation, or null when clean
  */
 export function findActiveHtml(html) {

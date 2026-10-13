@@ -142,9 +142,9 @@ synthesizer's originals — check its receipt says so.
 `docs/design/assessments/` and nowhere else, ending in `.md`. Refuse any path the workflow would reject. With `execute`,
 check (`test -L`, `realpath`) that neither the file nor any parent folder is a symlink and that the real parent stays
 inside the repository. If the file already exists with identical content, do nothing (a no-op resume); if it differs,
-stop and ask the user before replacing it. Refuse an HTML companion containing `<script>`, `on*=` handlers,
-`javascript:` URLs, `<iframe>`/`<object>`/`<embed>`/`<base>`/`<form>`/`<link>`, `<meta http-equiv>`, or any external
-`src`/`href`/`@import`/`url()`. Then save the returned Markdown at that path (and the HTML at the sibling `.html` path
+stop and ask the user before replacing it. Refuse an HTML companion that fails the best-effort denylist in
+`findActiveHtml` (`extensions/neo-arc-assessment/helpers.mjs`), the source of truth for the rules; it is not a
+sanitizer and passing it does not make the HTML safe. Then save the returned Markdown at that path (and the HTML at the sibling `.html` path
 only if requested), before any fact-checking. Save only those files.
 
 ### 10. Fact-check — three kinds, in parallel
