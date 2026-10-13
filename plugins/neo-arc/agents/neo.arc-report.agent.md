@@ -74,8 +74,10 @@ Return the content and this receipt.
 - **Workflow call (structured output requested):** return a JSON object with exactly `markdown` (the full report),
   `html` (the full self-contained HTML document, or `null` when not requested), and `receipt` (the template below as
   a string).
-- **Otherwise:** return the full report Markdown, then — only if requested — the HTML document in a fenced `html` block,
-  then the receipt template, each separated by a line saying which it is.
+- **Otherwise:** return three sections, each introduced by its own sentinel line on a line by itself:
+  `=== MARKDOWN ===` followed by the full report Markdown; `=== HTML ===` followed by the full HTML document (only
+  if requested; omit the section otherwise); and `=== RECEIPT ===` followed by the receipt template below. Nothing
+  appears outside these sections.
 
 The receipt is plain Markdown, filled in, with nothing before the first heading or after the last section. `Written`
 names where the caller will save the content; you have saved nothing.

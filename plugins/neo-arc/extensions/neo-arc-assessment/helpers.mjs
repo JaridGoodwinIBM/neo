@@ -206,6 +206,15 @@ export function validateOutputPath(value) {
     if (!value.startsWith(`${ASSESSMENT_DIR}/`)) {
         return { ok: false, error: `outputPath must be under ${ASSESSMENT_DIR}/` };
     }
+    // Portable names only: no `:` (NTFS alternate streams), spaces, or trailing dots; no Windows device names.
+    for (const segment of segments) {
+        if (!/^[A-Za-z0-9._-]+$/.test(segment) || segment.endsWith(".")) {
+            return { ok: false, error: "outputPath segments may contain only letters, digits, '.', '_' and '-', and must not end in '.'" };
+        }
+        if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(segment)) {
+            return { ok: false, error: `outputPath must not use a reserved device name: ${segment}` };
+        }
+    }
     const base = segments[segments.length - 1];
     if (!base.endsWith(".md") || base === ".md") {
         return { ok: false, error: "outputPath must name a Markdown file ending in .md" };
@@ -270,6 +279,28 @@ export function validateReportArgs(args) {
 }
 
 /**
+ * Reject active or external content in a report HTML document. Deterministic substring/regex policy:
+ * no scripts, event handlers, javascript: URLs, embedding elements, meta refresh, or external resources.
+ * @returns {string | null} a description of the first violation, or null when clean
+ */
+export function findActiveHtml(html) {
+    const rules = [
+        [/<\s*script\b/i, "<script> element"],
+        [/<\s*(iframe|frame|frameset|object|embed|applet|base|form)\b/i, "embedding or form element"],
+        [/<\s*meta\b[^>]*http-equiv/i, "<meta http-equiv>"],
+        [/<\s*link\b/i, "<link> element"],
+        [/\bon[a-z]+\s*=/i, "inline event handler"],
+        [/(?:javascript|vbscript)\s*:/i, "javascript: URL"],
+        [/\b(?:src|href|action|poster|data|srcset|xlink:href)\s*=\s*["']?\s*(?:https?:|\/\/|ftp:)/i, "external URL attribute"],
+        [/@import\b/i, "@import"],
+        [/url\(\s*["']?\s*(?:https?:|\/\/)/i, "external url() reference"],
+        [/\bdata:\s*text\/html/i, "data:text/html URL"],
+    ];
+    for (const [re, label] of rules) if (re.test(html)) return label;
+    return null;
+}
+
+/**
  * Validate the report worker's structured result (content only). The receipt must match TEMPLATES.report.
  * @returns {{ ok: true, markdown: string, html: string | null, receipt: string } | { ok: false, error: string }}
  */
@@ -283,6 +314,10 @@ export function validateReportResult(result, htmlRequested) {
     }
     if (htmlRequested && (typeof html !== "string" || html.trim() === "")) {
         return { ok: false, error: "report html was requested but is empty" };
+    }
+    if (htmlRequested) {
+        const violation = findActiveHtml(html);
+        if (violation) return { ok: false, error: `report html contains disallowed active or external content: ${violation}` };
     }
     if (typeof receipt !== "string") return { ok: false, error: "report receipt must be a string" };
     const check = checkTemplate(receipt, TEMPLATES.report);

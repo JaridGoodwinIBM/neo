@@ -79,7 +79,8 @@ async function plan(root, file, overwrite) {
     return "overwrite";
 }
 
-async function writeAtomic(root, file) {
+/** Write the content to a same-directory temp file (flags `wx`) after proving the parent is the validated real path. */
+async function stage(root, file) {
     const { dir } = await walkParents(root, file.relPath, true);
     // Containment proof: the real parent directory is exactly where the validated path says it is.
     const expected = path.join(root, ...file.relPath.split("/").slice(0, -1));
@@ -94,13 +95,38 @@ async function writeAtomic(root, file) {
         } finally {
             await handle.close();
         }
-        const stat = await lstatOrNull(dest);
-        if (stat?.isSymbolicLink()) throw new Error(`refusing symlink destination: ${file.relPath}`);
-        await fs.rename(temp, dest);
     } catch (error) {
         await fs.rm(temp, { force: true });
         throw error;
     }
+    return { dest, temp };
+}
+
+/**
+ * Move a staged temp file into place according to the planned action, without a check-then-act window:
+ * "create" uses link(), which fails with EEXIST instead of replacing; "overwrite" re-checks the destination
+ * immediately before rename(). Returns the status actually achieved.
+ */
+async function commit(staged, file, action) {
+    const { dest, temp } = staged;
+    if (action === "create") {
+        try {
+            await fs.link(temp, dest);
+        } catch (error) {
+            if (error.code !== "EEXIST") throw error;
+            // Something appeared after planning: accept it only if it is a regular file with identical content.
+            const stat = await lstatOrNull(dest);
+            if (stat?.isFile() && (await fs.readFile(dest, "utf8")) === file.content) return "unchanged";
+            throw new Error(`destination already exists with different content (appeared during the write): ${file.relPath}`);
+        }
+        return "created";
+    }
+    const stat = await lstatOrNull(dest);
+    if (stat === null || !stat.isFile()) {
+        throw new Error(`destination changed during the write (symlink, non-file, or removed): ${file.relPath}`);
+    }
+    await fs.rename(temp, dest);
+    return "overwritten";
 }
 
 /**
@@ -113,18 +139,35 @@ export async function preflightReportFiles(root, files, overwrite) {
 }
 
 /**
- * Persist report files idempotently: preflight all first, then write each via temp file + rename.
+ * Persist report files idempotently: preflight all, stage every temp file, then move each into place.
  * Identical existing content is left alone (safe replay); different content needs `overwrite`.
+ * If a later move fails, the error names the files already persisted (a rerun resumes idempotently).
  * @returns {Promise<Record<string, "created" | "unchanged" | "overwritten">>} status per relPath
  */
 export async function persistReportFiles(root, files, overwrite) {
     const plans = [];
     for (const file of files) plans.push(await plan(root, file, overwrite));
+    const staged = new Map();
     const status = {};
-    for (const [i, file] of files.entries()) {
-        const action = plans[i];
-        if (action !== "unchanged") await writeAtomic(root, file);
-        status[file.relPath] = action === "create" ? "created" : action === "overwrite" ? "overwritten" : "unchanged";
+    try {
+        for (const [i, file] of files.entries()) {
+            if (plans[i] !== "unchanged") staged.set(file.relPath, await stage(root, file));
+        }
+        for (const [i, file] of files.entries()) {
+            if (plans[i] === "unchanged") {
+                status[file.relPath] = "unchanged";
+                continue;
+            }
+            try {
+                status[file.relPath] = await commit(staged.get(file.relPath), file, plans[i]);
+            } catch (error) {
+                const done = Object.entries(status).map(([p, s]) => `${p} (${s})`);
+                const partial = done.length > 0 ? `; already persisted: ${done.join(", ")}` : "";
+                throw new Error(`${error.message}${partial}`);
+            }
+        }
+    } finally {
+        for (const { temp } of staged.values()) await fs.rm(temp, { force: true });
     }
     return status;
 }

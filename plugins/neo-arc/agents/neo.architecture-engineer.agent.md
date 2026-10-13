@@ -136,11 +136,16 @@ run log, and the output path. It **returns** Markdown with Mermaid figures and w
 companion **only** when the user asked for one. The report must carry the **refuters' corrected grades**, not the
 synthesizer's originals — check its receipt says so.
 
-**You persist it.** Validate the output path first: repo-relative, forward slashes, no `.` or `..` segments, under
-`docs/design/assessments/` (or the reports folder `AGENTS.md` names), ending in `.md`, and no symlink in it or its
-parent folders. If a different file already exists there, stop and ask the user before replacing it. Then save the
-returned Markdown at that path with your own `edit` tool (and the HTML at the sibling `.html` path only if requested),
-before any fact-checking. Save only those files.
+**You persist it**, under the same policy as the `neo-arc-assessment` workflow. Validate the output path first
+(default `docs/design/assessments/<date>-<slug>-assessment.md`): repo-relative, forward slashes, only letters, digits,
+`.`, `_`, `-` in each segment (no `:`, spaces, trailing dots, or Windows device names), no `.` or `..` segments, under
+`docs/design/assessments/` and nowhere else, ending in `.md`. Refuse any path the workflow would reject. With `execute`,
+check (`test -L`, `realpath`) that neither the file nor any parent folder is a symlink and that the real parent stays
+inside the repository. If the file already exists with identical content, do nothing (a no-op resume); if it differs,
+stop and ask the user before replacing it. Refuse an HTML companion containing `<script>`, `on*=` handlers,
+`javascript:` URLs, `<iframe>`/`<object>`/`<embed>`/`<base>`/`<form>`/`<link>`, `<meta http-equiv>`, or any external
+`src`/`href`/`@import`/`url()`. Then save the returned Markdown at that path (and the HTML at the sibling `.html` path
+only if requested), before any fact-checking. Save only those files.
 
 ### 10. Fact-check — three kinds, in parallel
 

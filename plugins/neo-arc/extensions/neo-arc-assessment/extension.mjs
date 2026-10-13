@@ -84,7 +84,8 @@ function retryPrompt(prompt, role, problems) {
 
 /**
  * Run one worker with at most one manual retry. Replies are validated here against the exact template
- * (and an optional semantic check); SDK output schemas are never used because they carry their own retry.
+ * (and an optional semantic check); SDK output schemas are not used here because they carry their own retry
+ * (only the Report step uses one, deliberately).
  * Errors thrown by ctx.agent propagate: they are workflow failures, not off-template replies.
  */
 async function runWorker(ctx, { role, item, prompt, validate }) {
