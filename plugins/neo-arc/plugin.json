@@ -16,6 +16,7 @@
     "observability"
   ],
   "agents": "agents/",
+  "extensions": "extensions/",
   "hooks": "hooks/hooks.json",
   "skills": "skills/"
 }
