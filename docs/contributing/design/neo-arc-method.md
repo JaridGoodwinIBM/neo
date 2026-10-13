@@ -178,7 +178,7 @@ The orchestrator's body spells these out, because Copilot has no scripted pipeli
 7. Spawn one `Neo Arc Refuter` per reuse claim in the synthesis, in parallel, capped at sixteen. Log the count dropped if the cap bites.
 8. One `Neo Arc Critic` run with the synthesis, the verdicts and the evidence map.
 9. One `Neo Arc Report` run. It writes to the repository's reports folder as `<date>-<topic>-assessment.md` and must carry the refuters' corrected grades, not the synthesizer's original ones.
-10. Three `Neo Arc Factcheck` runs in parallel on the written file, one check kind each. Apply every error and warning before presenting the report; list nits unapplied.
+10. Three `Neo Arc Factcheck` runs in parallel on the written file, one check kind each. Findings whose impact on the recommendation is `yes` or `unclear` are never auto-applied; they are put to the user. Apply the remaining errors and warnings before presenting the report; list nits unapplied.
 11. For a follow-up question, start at step 1 with a reader set sized to the question (two to four areas) and reuse the earlier evidence map as context, not as evidence.
 
 Two guardrails apply to every worker: never edit, create or stage a file, and cite `file:line` for every claim about the repository. The orchestrator never implements anything; it only routes and assembles.

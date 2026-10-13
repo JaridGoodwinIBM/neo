@@ -186,7 +186,8 @@ export async function persistReportFiles(root, files, overwrite) {
  * (already replaced: a no-op, which makes a resume after a partial commit idempotent). Anything else — missing,
  * externally edited, symlink, non-regular file — throws and nothing external is overwritten. Content is rechecked
  * immediately before each rename, which narrows but does not close the race, and the concurrent-parent-symlink
- * race documented on stage()/commit() remains (path strings, not directory handles). This is not atomic across files.
+ * race documented on stage()/commit() remains (path strings, not directory handles). This is not atomic across files:
+ * a failure after one file was swapped throws an error whose `persisted` property holds the per-file status so far.
  * @returns {Promise<Record<string, "overwritten" | "unchanged">>} status per relPath
  */
 export async function replaceReportFiles(root, previousFiles, revisedFiles) {
@@ -241,7 +242,7 @@ export async function replaceReportFiles(root, previousFiles, revisedFiles) {
             } catch (error) {
                 const done = Object.entries(status).map(([p, s]) => `${p} (${s})`);
                 const partial = done.length > 0 ? `; already persisted: ${done.join(", ")}` : "";
-                throw new Error(`${error.message}${partial}`);
+                throw Object.assign(new Error(`${error.message}${partial}`), { persisted: { ...status } });
             }
         }
     } finally {

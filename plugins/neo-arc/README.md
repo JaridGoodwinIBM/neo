@@ -61,8 +61,8 @@ The method's design record is
 | `neo.arc-factcheck.agent.md` | `Neo Arc Factcheck` | Checks the written report for one check kind | 3, parallel |
 
 Angles and lenses are passed in the prompt, not baked into separate agent files, so the same files serve every
-question. Every worker is read-only; only the orchestrator (applying fact-check fixes) and the report writer edit, and
-only the report.
+question. Every worker is read-only; only the orchestrator (applying fact-check fixes whose impact on the recommendation is not `yes` or `unclear`; those
+are put to the user) and the report writer edit, and only the report.
 
 The agents are **stack- and project-agnostic**. Layout, conventions, the reports folder, and the governing documents
 come from the consuming repo's `AGENTS.md`, ADRs, and PRDs — never baked into a prompt.

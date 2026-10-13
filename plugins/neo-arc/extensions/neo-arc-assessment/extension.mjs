@@ -529,10 +529,11 @@ const neoArcAssessment = defineWorkflow({
             try {
                 const verified = await ctx.step(
                     `${STEP_VERSION}:report:verify`,
-                    () => persistReportFiles(gitRoot, initialFiles, false),
+                    // Compare-and-swap with identical content: requires the files to exist and be unchanged, writes nothing.
+                    () => replaceReportFiles(gitRoot, initialFiles, initialFiles),
                     { volatile: true },
                 );
-                reportInfo = { ...reportInfo, written: verified };
+                reportInfo = { ...reportInfo, verified };
             } catch (error) {
                 return {
                     ok: false,
@@ -593,11 +594,11 @@ const neoArcAssessment = defineWorkflow({
                 ok: false,
                 status: "needs_user_decision",
                 question,
-                error: `report correction was not written (the file on disk was preserved): ${error.message}`,
+                error: `report correction may be partially applied (see report.partial for per-file status): ${error.message}`,
                 outputs,
                 claims,
                 coverage: finalCoverage,
-                report: reportInfo,
+                report: { ...reportInfo, partial: error.persisted ?? {} },
                 factcheck,
                 revision: { markdown: revisedFiles[0].content, html: wantHtml ? revisedFiles[1].content : null },
             };
