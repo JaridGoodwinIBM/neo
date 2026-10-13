@@ -111,7 +111,7 @@ same route that repo gets its `AGENTS.md`.
 | `systems.thinking` | `neo-product` | Feasibility lens |
 | `neo-product-requirements` skill | `neo-product` | Owns the PRD artifact and template |
 | `neo-design-thinking` skill | `neo-product` | |
-| `neo-system-thinking` skill | `neo-product` | Directory name is singular; the agent is `systems.thinking` |
+| `neo-systems-thinking` skill | `neo-product` | |
 | Lifecycle hooks + `log-event.sh` | `neo-core`, `neo-product` | Duplicated, not shared — a plugin cannot reference files outside its own directory |
 | `analyze_agent_logs.py` | `neo-core` | Analyzes logs the core hooks emit — ships with them |
 | **`master-control`** | **nothing** | Dev-time only |
