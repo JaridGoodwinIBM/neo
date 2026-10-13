@@ -113,9 +113,22 @@ test("parseRefuterVerdict normalizes case, wrapping and trailing punctuation", (
     assert.deepEqual(r2, { ok: true, verdict: "refuted", confidence: "medium", correctedGrade: "not-reusable" });
 });
 
-test("parseRefuterVerdict uses only the first line of a section", () => {
+test("parseRefuterVerdict ignores explanatory prose on following lines", () => {
     const r = parseRefuterVerdict(verdictReply("holds\nbecause the path exists", "low\nmore", "extend\nnotes"));
     assert.deepEqual(r, { ok: true, verdict: "holds", confidence: "low", correctedGrade: "extend" });
+});
+
+test("parseRefuterVerdict takes the first word when prose follows on the same line", () => {
+    const r = parseRefuterVerdict(verdictReply("holds because the path exists", "high - sure", "extend (see notes)"));
+    assert.deepEqual(r, { ok: true, verdict: "holds", confidence: "high", correctedGrade: "extend" });
+    const r2 = parseRefuterVerdict(verdictReply("**holds** - ok", "`medium` - mostly", "_pattern-only_ close"));
+    assert.deepEqual(r2, { ok: true, verdict: "holds", confidence: "medium", correctedGrade: "pattern-only" });
+    const r3 = parseRefuterVerdict(verdictReply("refuted: no such file", "low (guess)", "not-reusable; see above"));
+    assert.deepEqual(r3, { ok: true, verdict: "refuted", confidence: "low", correctedGrade: "not-reusable" });
+});
+
+test("parseRefuterVerdict still rejects an invalid first word followed by valid prose", () => {
+    assert.equal(parseRefuterVerdict(verdictReply("maybe holds", "high", "extend")).ok, false);
 });
 
 test("parseRefuterVerdict rejects missing or invalid values", () => {
