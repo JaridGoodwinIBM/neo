@@ -378,6 +378,7 @@ chmod 644 .github/hooks/scripts/enforce-guardrails.sh
 # => still the deny JSON and exit=0, because `bash "$s"` does not need the executable bit.
 #    A bare `"$s"` would exit 126: allow + warning in the wrapped form, a blanket denial in
 #    the strict form (the macOS bug).
-chmod 755 .github/hooks/scripts/enforce-guardrails.sh   # restore the executable bit
 ```
+
+Then restore the bit: `chmod 755 .github/hooks/scripts/enforce-guardrails.sh`
 
