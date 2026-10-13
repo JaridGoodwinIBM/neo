@@ -36,7 +36,8 @@
       "keywords": [
         "agents",
         "product",
-        "hooks"
+        "hooks",
+        "observability"
       ]
     }
   ]

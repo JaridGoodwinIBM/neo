@@ -23,10 +23,10 @@ safe-outputs:
 
 Audit this repository's documentation for drift against its actual structure and its own normative contract.
 
-1. Read `docs/contributing/reference/plugin-contract.md` — this is the **normative** source of truth for plugin folder shape, manifest fields, and naming (`neo.<role>.agent.md` files, `name: Neo <Role>` frontmatter, `neo-` skill prefixes).
+1. Read `docs/contributing/reference/plugin-contract.md` — this is the **normative** source of truth for plugin folder shape, manifest fields, and naming (`neo.<role>.agent.md` or `neo.<domain>.<role>.agent.md` files, a `name:` frontmatter that starts with `Neo ` and unambiguously identifies the agent, `neo-` skill prefixes). See §4 of the contract; `name:` need not be a mechanical transform of the filename.
 2. Enumerate the actual contents of `plugins/*/` (agents, skills, plugin manifest, hooks config) using shell commands as needed.
 3. Compare the actual layout against the contract and flag:
-   - Agent files that don't follow `neo.<role>.agent.md` naming, or whose `name:` frontmatter doesn't match `Neo <Role>`.
+   - Agent files that don't follow the §4 filename grammar (`neo.<role>.agent.md`, or `neo.<domain>.<role>.agent.md` in a multi-domain plugin), or whose `name:` frontmatter doesn't start with `Neo ` or doesn't unambiguously identify that agent. Do not require `name:` to be an exact mechanical transform of the filename.
    - Skills that aren't `neo-` prefixed (excluding explicitly vendored/upstream skills that keep their upstream name).
    - Missing or malformed required fields in `plugin.json` / `hooks.json`.
 4. Cross-check top-level docs — `AGENTS.md`, `README.md`, `docs/README.md`, `docs/getting-started.md`, `docs/glossary.md`, `docs/concepts/*.md`, `docs/guides/*.md`, `docs/contributing/README.md`, `docs/contributing/reference/stack-plugin-contract.md` — for statements that contradict the current repo layout, including:
