@@ -15,7 +15,36 @@ export const TEMPLATES = {
         "Areas",
         "External product",
     ],
+    reader: ["Area", "Summary", "Existing mentions of", "Reuse claims", "Gaps", "Constraints", "Facts"],
+    designer: [
+        "Name and thesis",
+        "What the capability means here",
+        "Stages",
+        "New components",
+        "Reused components",
+        "Configuration",
+        "ADR impact",
+        "PRD sections touched",
+        "Human gates",
+        "Risks",
+        "Open questions for the user",
+        "Rough effort",
+    ],
+    judge: ["Lens", "Scores", "Winner", "Graft from the others", "Factual errors spotted"],
+    synthesizer: [
+        "Recommendation",
+        "Phased plan",
+        "Reuse claims the recommendation depends on",
+        "Not reusable",
+        "ADR work",
+        "PRD work",
+        "Decisions only the user can make",
+        "Judge disagreements",
+    ],
     refuter: ["Claim", "Verdict", "Confidence", "Reason", "Evidence", "Corrected grade"],
+    critic: ["Missing", "Unverified claims", "Premature or overbuilt", "Sharpest question for the user"],
+    report: ["Written", "Grades carried", "Unread areas"],
+    factcheck: ["Check kind", "Checked", "Findings"],
 };
 
 /**
@@ -93,7 +122,8 @@ export function startAttempt() {
  */
 export function nextAttempt(state, onTemplate) {
     if (state.status === "accepted" || state.status === "failed") return state;
-    const attempts = state.attempts + 1;
+    if (state.attempts >= 2 && !onTemplate) return { status: "failed", attempts: state.attempts };
+    const attempts = Math.min(state.attempts + 1, 2);
     if (onTemplate) return { status: "accepted", attempts };
     return { status: state.status === "retry" ? "failed" : "retry", attempts };
 }
