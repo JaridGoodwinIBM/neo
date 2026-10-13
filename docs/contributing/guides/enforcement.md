@@ -54,8 +54,8 @@ All three produced a non-zero exit, and a non-zero exit on `preToolUse` denies t
 Spending that failure mode on weak, redundant enforcement of someone else's policy is a bad
 trade. So the scripts stay in-tree, unregistered, and a team that wants the behavior opts in
 below — with a wrapper that turns those infrastructure failures into allow-with-warning
-instead of a blanket denial. `scripts/validate-plugins.py` fails the build if a shipped plugin registers
-`preToolUse` again.
+instead of a blanket denial. `scripts/validate-plugins.py` fails the build if a shipped plugin
+registers `preToolUse` again.
 
 ## Files
 
@@ -129,11 +129,10 @@ Keep them if you adapt it:
   - Child exits non-zero → any partial stdout is discarded, one line
     `Neo enforce-guardrails: hook exited N; allowing (fail-open).` goes to stderr, and the
     wrapper exits 0.
-  - The PowerShell form seeds `$c = 127` and wraps the launch in `try`/`catch` so a missing
-    `pwsh` is not mistaken for success: without it, `$LASTEXITCODE` would still hold the `0`
-    left by `git rev-parse`.
-  - The bash and PowerShell strings must be kept in sync. The nested `pwsh` launch costs about
-    0.4s per call, well inside `timeoutSec: 10`.
+  - The PowerShell form wraps the launch in `try`/`catch` and seeds `$c = 127`, so a failed
+    launch (where `$LASTEXITCODE` is never read) reports a real exit code in the warning
+    instead of an empty one. It fails open either way; the sentinel only makes the message
+    useful.
   - **Trade-off:** a crash that would have denied now allows, with a warning. Enforcement fails
     *off*, visibly only on stderr. That is acceptable because this is a speed bump backed by
     server-side branch protection (see § Why they are opt-in).
@@ -143,10 +142,13 @@ Keep them if you adapt it:
   - If the child exits 0 with non-JSON stdout, the wrapper passes it through unchanged (the Neo
     scripts never do this).
 
-The tables below are **child** exit codes, measured on the script alone, same script, same
-machine. In the wrapped form any non-zero becomes allow-with-warning (enforcement silently
-off); the "denies everything" labels describe the strict, unwrapped form. Windows, by
-effective execution policy:
+Keep the bash and PowerShell strings in sync if you adapt either. The nested `pwsh` launch in
+the PowerShell form adds a few hundred ms per call, well inside `timeoutSec: 10`.
+
+The tables below are **child** exit codes: the same script on the same machine, run under each
+launch form shown in the column headers. In the wrapped form any non-zero becomes
+allow-with-warning (enforcement off, with a stderr warning); the "denies everything" labels
+describe the strict, unwrapped form. Windows, by effective execution policy:
 
 | Effective policy | `& $s` | `pwsh -ExecutionPolicy Bypass -File "$s"` |
 | --- | --- | --- |
@@ -289,12 +291,14 @@ lever and leaves observability logging intact.
 
 ## Verify
 
-Pipe a sample payload through the hook and check the decision:
+Pipe a sample payload through the hook and check the decision. The comments show the shape of
+the output, not its exact bytes: the bash script prints the JSON with a space after each colon
+and comma, the PowerShell script prints it compact.
 
 ```bash
 printf '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
-# => {"permissionDecision":"deny","permissionDecisionReason":"Neo guardrail: pushing to 'main'…"}
+# => {"permissionDecision": "deny", "permissionDecisionReason": "Neo guardrail: pushing to 'main'…"}
 
 printf '{"toolName":"bash","toolArgs":{"command":"gh pr create --draft"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
@@ -302,7 +306,7 @@ printf '{"toolName":"bash","toolArgs":{"command":"gh pr create --draft"}}' \
 
 printf '{"toolName":"create_pull_request","toolArgs":{"title":"x"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
-# => {"permissionDecision":"deny","permissionDecisionReason":"Neo guardrail: agents open DRAFT…"}
+# => {"permissionDecision": "deny", "permissionDecisionReason": "Neo guardrail: agents open DRAFT…"}
 ```
 
 Test the **whole hook command**, not just the script — the failure this page exists to prevent
@@ -325,7 +329,9 @@ $LASTEXITCODE
 condition, because process scope is inherited by children unless they set their own. The
 wrapped command still prints the deny JSON, since the inner `pwsh` sets its own `Bypass`.
 
-Fail-open check — swap in a child that exits non-zero, then restore it:
+Fail-open check, reusing `$cmd` from above — swap in a child that exits non-zero, then restore
+it. If you interrupt this block, restore the script yourself with `Move-Item -Force "$s.bak" $s`,
+or the vendored guardrail stays stubbed out:
 
 ```powershell
 $s = "$(git rev-parse --show-toplevel)/.github/hooks/scripts/enforce-guardrails.ps1"
@@ -351,7 +357,9 @@ echo "exit=$?"
 # => the deny JSON, and exit=0.
 ```
 
-Fail-open check — swap in a child that exits non-zero, then restore it:
+Fail-open check, reusing `cmd` from above — swap in a child that exits non-zero, then restore
+it. If you interrupt this block, restore the script yourself with `mv "$s.bak" "$s"`, or the
+vendored guardrail stays stubbed out:
 
 ```bash
 s="$(git rev-parse --show-toplevel)/.github/hooks/scripts/enforce-guardrails.sh"
@@ -370,5 +378,6 @@ chmod 644 .github/hooks/scripts/enforce-guardrails.sh
 # => still the deny JSON and exit=0, because `bash "$s"` does not need the executable bit.
 #    A bare `"$s"` would exit 126: allow + warning in the wrapped form, a blanket denial in
 #    the strict form (the macOS bug).
+chmod 755 .github/hooks/scripts/enforce-guardrails.sh   # restore the executable bit
 ```
 
