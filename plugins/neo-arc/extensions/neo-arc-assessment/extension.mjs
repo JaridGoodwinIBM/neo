@@ -1,15 +1,140 @@
 import { defineWorkflow, joinSession } from "@github/copilot-sdk/extension";
+import {
+    REUSE_GRADES,
+    TEMPLATES,
+    checkTemplate,
+    nextAttempt,
+    normalizeQuestion,
+    propagateGrades,
+    startAttempt,
+    summarizeCoverage,
+} from "./helpers.mjs";
+import {
+    parseAreas,
+    parseExternalProduct,
+    parseRefuterVerdict,
+    parseReuseClaims,
+    sectionText,
+} from "./parse.mjs";
 
-const SCOUT_AGENT = "neo-arc:neo.arc-scout";
+const AGENTS = {
+    scout: "neo-arc:neo.arc-scout",
+    reader: "neo-arc:neo.arc-reader",
+    designer: "neo-arc:neo.arc-designer",
+    judge: "neo-arc:neo.arc-judge",
+    synthesizer: "neo-arc:neo.arc-synthesizer",
+    refuter: "neo-arc:neo.arc-refuter",
+    critic: "neo-arc:neo.arc-critic",
+};
+
+const STEP_VERSION = "assessment-v1";
+const MAX_REFUTERS = 16;
+// 1 Scout + up to 12 Readers (11 areas + external) + 3 Designers + 3 Judges + 1 Synthesizer + 16 Refuters + 1 Critic = 37
+// logical calls, each with at most one manual retry.
+const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1;
+const MAX_TOTAL_SUBAGENTS = MAX_LOGICAL_CALLS * 2;
+
+const DESIGNER_ANGLES = [
+    {
+        id: "smallest-change",
+        angle: "Smallest change — the smallest change that delivers the capability behind existing seams.",
+    },
+    {
+        id: "mirror",
+        angle: "Mirror — mirror an integration or subsystem that already exists in this repository.",
+    },
+    { id: "first-class", angle: "First-class — treat the capability as first-class, with its own lifecycle." },
+];
+
+const JUDGE_LENSES = [
+    {
+        id: "maintainer",
+        lens: "Repository maintainer — will this fit the code, conventions, and tests that already exist?",
+    },
+    { id: "architect", lens: "Domain architect — is this the right shape for the capability and its contracts?" },
+    {
+        id: "security",
+        lens: "Security and governance reviewer — what does this expose, and what does it need approved?",
+    },
+];
+
+function retryPrompt(prompt, role, problems) {
+    const headings = TEMPLATES[role].map((h) => `## ${h}`).join("\n");
+    return (
+        `${prompt}\n\nYour previous reply was rejected: ${problems.join("; ")}.\n` +
+        `Reply with exactly these \`##\` headings, in this order, and nothing before the first heading:\n\n` +
+        `${headings}\n\nReturn only this template.`
+    );
+}
+
+/**
+ * Run one worker with at most one manual retry. Replies are validated here against the exact template
+ * (and an optional semantic check); SDK output schemas are never used because they carry their own retry.
+ * Errors thrown by ctx.agent propagate: they are workflow failures, not off-template replies.
+ */
+async function runWorker(ctx, { role, item, prompt, validate }) {
+    let state = startAttempt();
+    let problems = [];
+    let output;
+    while (state.status === "pending" || state.status === "retry") {
+        const attempt = state.attempts + 1;
+        const text = attempt === 1 ? prompt : retryPrompt(prompt, role, problems);
+        const reply = await ctx.step(`${STEP_VERSION}:${role}:${item}:attempt-${attempt}`, async () => {
+            const result = await ctx.agent(text, {
+                label: `neo-arc-assessment: ${role} ${item} attempt ${attempt}`,
+                agent: AGENTS[role],
+            });
+            return typeof result === "string" ? result : null;
+        });
+        const check = checkTemplate(reply, TEMPLATES[role]);
+        problems = [...check.problems];
+        if (check.ok && validate) {
+            const extra = validate(reply);
+            if (!extra.ok) problems.push(extra.error);
+        }
+        state = nextAttempt(state, problems.length === 0);
+        if (state.status === "accepted") output = reply;
+    }
+    return state.status === "accepted" ? { ...state, output } : { ...state, problems };
+}
+
+/** ctx.parallel turns a thrown worker into null; record that as a failed unit. */
+async function runParallel(ctx, units, makeThunk) {
+    const raw = await ctx.parallel(units.map((unit) => () => makeThunk(unit)));
+    const results = {};
+    units.forEach((unit, i) => {
+        results[unit.id] = raw[i] ?? { status: "failed", attempts: 0, problems: ["worker did not return a result"] };
+    });
+    return results;
+}
+
+const acceptedOutputs = (results) =>
+    Object.fromEntries(
+        Object.entries(results)
+            .filter(([, r]) => r.status === "accepted")
+            .map(([id, r]) => [id, r.output]),
+    );
 
 const neoArcAssessment = defineWorkflow({
     meta: {
         name: "neo-arc-assessment",
         description:
             "Explicit-only: run only when the user asks for the neo-arc-assessment workflow by name. " +
-            "Vertical slice of the Neo Arc assessment: one Neo Arc Scout call over the repository for a design question. " +
+            "Partial Neo Arc assessment, Scout through Critic (no Report or Factcheck, no files written): " +
+            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic. " +
+            "Call ceiling: at most 37 logical calls (1 Scout + up to 12 Readers + 3 Designers + 3 Judges + 1 Synthesizer + " +
+            "16 Refuters + 1 Critic), each with at most one manual retry = 74 subagent attempts (maxTotalSubagents). " +
+            "No AI-credit estimate is made. " +
             "args: { question: string } — the architecture design question.",
-        phases: [{ title: "Scout" }],
+        phases: [
+            { title: "Scout" },
+            { title: "Readers" },
+            { title: "Designers" },
+            { title: "Judges" },
+            { title: "Synthesizer" },
+            { title: "Refuters" },
+            { title: "Critic" },
+        ],
         argsSchema: {
             type: "object",
             required: ["question"],
@@ -17,28 +142,220 @@ const neoArcAssessment = defineWorkflow({
                 question: { type: "string" },
             },
         },
+        limits: { maxTotalSubagents: MAX_TOTAL_SUBAGENTS },
     },
     run: async (ctx) => {
-        const question = ctx.args?.question;
-        if (typeof question !== "string" || question.trim() === "") {
-            return { ok: false, error: "question is required and must be a non-empty string" };
-        }
+        const q = normalizeQuestion(ctx.args?.question);
+        if (!q.ok) return { ok: false, error: q.error };
+        const question = q.question;
 
+        const outputs = {};
+        const stages = {}; // role -> { requested: string[], results: Record<id, result> }
+        const refuterInfo = { attempted: 0, dropped: 0 };
+        let claims = [];
+
+        const record = (role, requested, results) => {
+            stages[role] = { requested, results };
+        };
+        const buildCoverage = () => {
+            const byStage = {};
+            for (const [role, { requested, results }] of Object.entries(stages)) {
+                byStage[role] = summarizeCoverage(requested, results).stages;
+            }
+            const readers = stages.reader
+                ? summarizeCoverage(stages.reader.requested, stages.reader.results)
+                : { requested: [], read: [], unread: [] };
+            const graded = claims.filter((c) => c.originalGrade !== undefined);
+            return {
+                readers: { requested: readers.requested, read: readers.read, unread: readers.unread },
+                stages: byStage,
+                refuters: { ...refuterInfo },
+                claims: {
+                    total: claims.length,
+                    downgraded: graded.filter(
+                        (c) => !c.unverified && REUSE_GRADES.indexOf(c.grade) > REUSE_GRADES.indexOf(c.originalGrade),
+                    ).length,
+                    refuted: graded.filter((c) => c.verdict === "refuted").length,
+                    unverified: graded.filter((c) => c.unverified).length,
+                },
+            };
+        };
+        const fail = (failedStage, error) => ({
+            ok: false,
+            question,
+            failedStage,
+            error,
+            coverage: buildCoverage(),
+            outputs,
+        });
+        const failureText = (name, result) =>
+            `${name} failed after ${result.attempts} attempt(s): ${(result.problems ?? []).join("; ")}`;
+
+        // Scout
         ctx.phase("Scout");
-        let brief;
-        try {
-            brief = await ctx.agent(
-                `Scout the repository for this architecture design question and return the reader brief:\n\n${question.trim()}`,
-                { label: "neo-arc-assessment: scout", agent: SCOUT_AGENT },
-            );
-        } catch (err) {
-            return { ok: false, error: `scout failed: ${err instanceof Error ? err.message : String(err)}` };
-        }
+        const scout = await runWorker(ctx, {
+            role: "scout",
+            item: "scout",
+            prompt: `Scout the repository for this architecture design question and return the reader brief:\n\n${question}`,
+            validate: (reply) => {
+                const parsedAreas = parseAreas(reply);
+                if (!parsedAreas.ok) return parsedAreas;
+                const parsedExternal = parseExternalProduct(reply);
+                if (!parsedExternal.ok) return parsedExternal;
+                if (!sectionText(reply, "Shared context")) return { ok: false, error: '"Shared context" section is empty' };
+                return { ok: true };
+            },
+        });
+        record("scout", ["scout"], { scout });
+        if (scout.status !== "accepted") return fail("scout", failureText("scout", scout));
+        outputs.scout = scout.output;
+        const sharedContext = sectionText(scout.output, "Shared context");
+        const areas = parseAreas(scout.output).areas;
+        const external = parseExternalProduct(scout.output).product;
 
-        if (brief === null || brief === undefined || (typeof brief === "string" && brief.trim() === "")) {
-            return { ok: false, error: "scout returned no brief" };
+        // Readers
+        ctx.phase("Readers");
+        const readerUnits = areas.map((a, i) => ({
+            id: `area-${i + 1}`,
+            brief: `Area ${a.n}: ${a.area}\nAnchor files: ${a.anchors}\nWhat to look for: ${a.lookFor}`,
+        }));
+        if (external !== null) {
+            readerUnits.push({
+                id: "external",
+                brief: `You are the external-product reader. Your area is this external product and its primary-source home:\n${external}`,
+            });
         }
-        return { ok: true, scout: brief };
+        const readerResults = await runParallel(ctx, readerUnits, (unit) =>
+            runWorker(ctx, {
+                role: "reader",
+                item: unit.id,
+                prompt: `Shared context:\n${sharedContext}\n\nQuestion:\n${question}\n\nYour area brief:\n${unit.brief}`,
+            }),
+        );
+        record("reader", readerUnits.map((u) => u.id), readerResults);
+        const readerOutputs = acceptedOutputs(readerResults);
+        outputs.readers = readerOutputs;
+        const unreadIds = readerUnits.filter((u) => !(u.id in readerOutputs)).map((u) => u.id);
+        if (unreadIds.length === readerUnits.length) {
+            return fail("readers", "no reader produced an accepted output; there is no evidence to design from");
+        }
+        const evidenceMap =
+            readerUnits
+                .filter((u) => u.id in readerOutputs)
+                .map((u) => readerOutputs[u.id])
+                .join("\n\n") +
+            (unreadIds.length > 0 ? `\n\nUnread areas (no evidence gathered; treat as gaps): ${unreadIds.join(", ")}` : "");
+
+        // Designers
+        ctx.phase("Designers");
+        const designerResults = await runParallel(ctx, DESIGNER_ANGLES, (a) =>
+            runWorker(ctx, {
+                role: "designer",
+                item: a.id,
+                prompt: `Shared context:\n${sharedContext}\n\nQuestion:\n${question}\n\nEvidence map:\n${evidenceMap}\n\nYour angle:\n${a.angle}`,
+            }),
+        );
+        record("designer", DESIGNER_ANGLES.map((a) => a.id), designerResults);
+        outputs.designers = acceptedOutputs(designerResults);
+        const failedDesigner = DESIGNER_ANGLES.find((a) => designerResults[a.id].status !== "accepted");
+        if (failedDesigner) {
+            return fail("designers", failureText(`designer ${failedDesigner.id}`, designerResults[failedDesigner.id]));
+        }
+        const designs = DESIGNER_ANGLES.map((a, i) => `### Design ${i + 1} (${a.id})\n\n${outputs.designers[a.id]}`).join("\n\n");
+
+        // Judges
+        ctx.phase("Judges");
+        const judgeResults = await runParallel(ctx, JUDGE_LENSES, (l) =>
+            runWorker(ctx, {
+                role: "judge",
+                item: l.id,
+                prompt:
+                    `Shared context:\n${sharedContext}\n\nQuestion:\n${question}\n\nThe three designs:\n${designs}\n\n` +
+                    `Evidence map:\n${evidenceMap}\n\nYour lens:\n${l.lens}`,
+            }),
+        );
+        record("judge", JUDGE_LENSES.map((l) => l.id), judgeResults);
+        outputs.judges = acceptedOutputs(judgeResults);
+        const failedJudge = JUDGE_LENSES.find((l) => judgeResults[l.id].status !== "accepted");
+        if (failedJudge) return fail("judges", failureText(`judge ${failedJudge.id}`, judgeResults[failedJudge.id]));
+        const judgements = JUDGE_LENSES.map((l, i) => `### Judgement ${i + 1} (${l.id})\n\n${outputs.judges[l.id]}`).join("\n\n");
+
+        // Synthesizer
+        ctx.phase("Synthesizer");
+        const synth = await runWorker(ctx, {
+            role: "synthesizer",
+            item: "synthesizer",
+            prompt:
+                `Shared context:\n${sharedContext}\n\nQuestion:\n${question}\n\nEvidence map:\n${evidenceMap}\n\n` +
+                `The three designs:\n${designs}\n\nThe three judgements:\n${judgements}`,
+            validate: parseReuseClaims,
+        });
+        record("synthesizer", ["synthesizer"], { synthesizer: synth });
+        if (synth.status !== "accepted") return fail("synthesizer", failureText("synthesizer", synth));
+        outputs.synthesizer = synth.output;
+        claims = parseReuseClaims(synth.output).claims;
+
+        // Refuters
+        ctx.phase("Refuters");
+        const toRefute = claims.slice(0, MAX_REFUTERS);
+        refuterInfo.attempted = toRefute.length;
+        refuterInfo.dropped = claims.length - toRefute.length;
+        const refuterResults = await runParallel(ctx, toRefute, (claim) =>
+            runWorker(ctx, {
+                role: "refuter",
+                item: claim.id,
+                prompt:
+                    `Question:\n${question}\n\nReuse claim to refute:\n- Component: ${claim.component}\n- Path: ${claim.path}\n` +
+                    `- Grade as claimed: ${claim.grade}\n- How it is reused: ${claim.how}`,
+                validate: parseRefuterVerdict,
+            }),
+        );
+        record("refuter", toRefute.map((c) => c.id), refuterResults);
+        const verdicts = {};
+        const refuterOutputs = {};
+        for (const claim of toRefute) {
+            const result = refuterResults[claim.id];
+            if (result.status === "accepted") {
+                const { verdict, confidence, correctedGrade } = parseRefuterVerdict(result.output);
+                verdicts[claim.id] = { verdict, confidence, correctedGrade };
+                refuterOutputs[claim.id] = { claim, output: result.output };
+            }
+        }
+        outputs.refuters = refuterOutputs;
+        const attemptedIds = new Set(toRefute.map((c) => c.id));
+        claims = propagateGrades(claims, verdicts).map((c) => {
+            if (!attemptedIds.has(c.id)) return { ...c, refuterStatus: "not-attempted-over-cap" };
+            if (c.id in verdicts) return { ...c, refuterStatus: "accepted" };
+            // A refuter that failed twice leaves the claim unconfirmed, so it does not hold.
+            return { ...c, verdict: "refuted", confidence: "low", refuterStatus: "failed" };
+        });
+
+        // Critic
+        ctx.phase("Critic");
+        const pairedVerdicts = claims
+            .map((c) => {
+                const head = `- ${c.id} ${c.component} (${c.path}): claimed ${c.originalGrade}`;
+                if (c.refuterStatus === "not-attempted-over-cap") {
+                    return `${head}; not refuted (over the ${MAX_REFUTERS}-claim cap) — unverified`;
+                }
+                if (c.refuterStatus === "failed") {
+                    return `${head}; refuter failed twice — refuted, confidence low, corrected grade unverified`;
+                }
+                return `${head}; verdict ${c.verdict}, confidence ${c.confidence}, corrected grade ${c.grade}`;
+            })
+            .join("\n");
+        const critic = await runWorker(ctx, {
+            role: "critic",
+            item: "critic",
+            prompt:
+                `Question:\n${question}\n\nSynthesis:\n${outputs.synthesizer}\n\nRefuter verdicts paired with their claims:\n` +
+                `${pairedVerdicts || "(no reuse claims)"}\n\nEvidence map:\n${evidenceMap}`,
+        });
+        record("critic", ["critic"], { critic });
+        if (critic.status !== "accepted") return fail("critic", failureText("critic", critic));
+        outputs.critic = critic.output;
+
+        return { ok: true, question, outputs, claims, coverage: buildCoverage() };
     },
 });
 
