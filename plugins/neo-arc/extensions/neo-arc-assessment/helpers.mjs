@@ -122,10 +122,12 @@ export function startAttempt() {
  */
 export function nextAttempt(state, onTemplate) {
     if (state.status === "accepted" || state.status === "failed") return state;
-    if (state.attempts >= 2 && !onTemplate) return { status: "failed", attempts: state.attempts };
-    const attempts = Math.min(state.attempts + 1, 2);
+    const prior = Number.isFinite(state.attempts) ? Math.max(0, Math.floor(state.attempts)) : 0;
+    const attempts = Math.min(prior + 1, 2);
     if (onTemplate) return { status: "accepted", attempts };
-    return { status: state.status === "retry" ? "failed" : "retry", attempts };
+    // Unknown statuses are treated as pending. `retry` is only returned while a further run is still allowed.
+    if (attempts >= 2 || state.status === "retry") return { status: "failed", attempts };
+    return { status: "retry", attempts };
 }
 
 /**
