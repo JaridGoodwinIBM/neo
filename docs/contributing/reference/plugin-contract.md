@@ -104,10 +104,11 @@ Two things are conflated easily here, so they are separated below:
   [CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference).
 - **House rule** — what *Neo* additionally requires of its own plugins. Not enforced by the
   CLI. `scripts/validate-plugins.py` enforces only part of it: that the manifests parse, that
-  declared (and present) `agents`/`skills`/`hooks` paths resolve, that each marketplace
-  `plugins[].source` resolves and its `version` matches that plugin's `plugin.json`, and that
-  no marketplace entry declares component paths. The remaining house rules (required
-  identity fields, `keywords[]`, `metadata.*`) are held by review.
+  declared `agents`/`skills`/`hooks` paths resolve (inside the plugin, and non-empty) and
+  that existing component directories are declared, that each marketplace `plugins[].source`
+  resolves and its `version` matches that plugin's `plugin.json`, and that no marketplace
+  entry declares component paths — plus hooks and agent-frontmatter checks. The remaining
+  house rules (required identity fields, `keywords[]`, `metadata.*`) are held by review.
 
 Per the spec, **`name` is the only required field in `plugin.json`.** Everything else is
 optional. Neo requires more because a shipped plugin with no author, license, or description
@@ -224,7 +225,8 @@ owned by [`hook-contract.md`](./hook-contract.md).
   together automatically after a merge to `main` that touches `plugins/**`:
   `.github/workflows/version-bump.yml` opens a PR from `scripts/bump-versions.py`, which
   derives the bump level from the Conventional Commit types of the commits that touched that
-  plugin (`!`/`BREAKING CHANGE` → major, `feat` → minor, anything else → patch). It does not
+  plugin's directory (`!`/`BREAKING CHANGE` → major, `feat` → minor, anything else → patch),
+  skipping `chore(release)` commits; a plugin no commit touched is not bumped. It does not
   touch `metadata.version`.
 - `license`, `author.name` / `owner.name` — identity describes one project.
 - `keywords[]` — kept meaningful per manifest.
