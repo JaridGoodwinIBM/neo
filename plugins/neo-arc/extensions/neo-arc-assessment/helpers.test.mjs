@@ -24,16 +24,26 @@ test("normalizeQuestion rejects non-string, empty and whitespace input", () => {
     }
 });
 
-test("TEMPLATES has all nine keys", () => {
-    assert.deepEqual(
-        Object.keys(TEMPLATES).sort(),
-        ["critic", "designer", "factcheck", "judge", "reader", "refuter", "report", "scout", "synthesizer"],
-    );
+// Independent literals copied from the architecture-engineer "Template checklist".
+const EXPECTED = {
+    scout: ["Question", "Shared context", "What the question means", "Repository state", "Governing documents", "Keyword hits", "Areas", "External product"],
+    reader: ["Area", "Summary", "Existing mentions of", "Reuse claims", "Gaps", "Constraints", "Facts"],
+    designer: ["Name and thesis", "What the capability means here", "Stages", "New components", "Reused components", "Configuration", "ADR impact", "PRD sections touched", "Human gates", "Risks", "Open questions for the user", "Rough effort"],
+    judge: ["Lens", "Scores", "Winner", "Graft from the others", "Factual errors spotted"],
+    synthesizer: ["Recommendation", "Phased plan", "Reuse claims the recommendation depends on", "Not reusable", "ADR work", "PRD work", "Decisions only the user can make", "Judge disagreements"],
+    refuter: ["Claim", "Verdict", "Confidence", "Reason", "Evidence", "Corrected grade"],
+    critic: ["Missing", "Unverified claims", "Premature or overbuilt", "Sharpest question for the user"],
+    report: ["Written", "Grades carried", "Unread areas"],
+    factcheck: ["Check kind", "Checked", "Findings"],
+};
+
+test("TEMPLATES matches the orchestrator checklist exactly, in order", () => {
+    assert.deepEqual(TEMPLATES, EXPECTED);
 });
 
-test("checkTemplate accepts a generated template for every key", () => {
-    for (const [key, headings] of Object.entries(TEMPLATES)) {
-        const r = checkTemplate(build(headings), headings);
+test("checkTemplate accepts a template generated from the literals for every key", () => {
+    for (const [key, headings] of Object.entries(EXPECTED)) {
+        const r = checkTemplate(build(headings), TEMPLATES[key]);
         assert.deepEqual(r, { ok: true, problems: [] }, key);
     }
 });
