@@ -19,9 +19,10 @@ concurrency: version-bump
 
 jobs:
   bump:
-    runs-on: ubuntu-latest
+    # Keep OS upgrades explicit rather than following ubuntu-latest migrations.
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
