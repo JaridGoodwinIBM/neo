@@ -7,9 +7,10 @@ on:
 
 jobs:
   manifests-and-plugins:
-    runs-on: ubuntu-latest
+    # Keep OS upgrades explicit rather than following ubuntu-latest migrations.
+    runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate all JSON manifests + hooks parse
         run: |
