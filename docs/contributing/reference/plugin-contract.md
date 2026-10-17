@@ -103,7 +103,12 @@ Two things are conflated easily here, so they are separated below:
 - **Spec** — what GitHub Copilot CLI itself requires or defines. Source:
   [CLI plugin reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-plugin-reference).
 - **House rule** — what *Neo* additionally requires of its own plugins. Not enforced by the
-  CLI; enforced by `scripts/validate-plugins.py`.
+  CLI. `scripts/validate-plugins.py` enforces only part of it: that the manifests parse, that
+  declared `agents`/`skills`/`hooks` paths resolve (inside the plugin, and non-empty) and
+  that existing component directories are declared, that each marketplace `plugins[].source`
+  resolves and its `version` matches that plugin's `plugin.json`, and that no marketplace
+  entry declares component paths — plus hooks and agent-frontmatter checks. The remaining
+  house rules (required identity fields, `keywords[]`, `metadata.*`) are held by review.
 
 Per the spec, **`name` is the only required field in `plugin.json`.** Everything else is
 optional. Neo requires more because a shipped plugin with no author, license, or description
@@ -112,19 +117,19 @@ them is still valid.
 
 ### 2.1 A plugin's `plugin.json`
 
-`plugin.json` lives at the **plugin root**. Values below are transcribed from
+`plugin.json` lives at the **plugin root**. Literal values below are transcribed from
 `plugins/neo-core/`; `plugins/neo-product/` carries the same fields with its own values.
 
 | Field         | Value                                            | Spec        | House rule                       |
 | ------------- | ------------------------------------------------ | ----------- | -------------------------------- |
 | `name`        | `"neo-core"`                                     | Required.   | Kebab-case, `neo-` prefixed.     |
-| `version`     | semver, e.g. `"2.0.4"`                           | Optional.   | Required. Each plugin versions independently. |
+| `version`     | semver string                                    | Optional.   | Required. Each plugin versions independently. |
 | `description` | present ("… Copilot CLI manifest")               | Optional.   | Required.                        |
 | `author.name` | `"Chad Thomas"`                                  | Optional.   | Required.                        |
 | `homepage`    | `"https://github.com/skyarkitekten/neo"`         | Optional.   | Required.                        |
 | `repository`  | `"https://github.com/skyarkitekten/neo"`         | Optional.   | Required.                        |
 | `license`     | `"MIT"`                                          | Optional.   | Required.                        |
-| `keywords[]`  | 6 entries                                        | Optional.   | Required.                        |
+| `keywords[]`  | string array, chosen per plugin (see §3.1)       | Optional.   | Required.                        |
 | `agents`      | `"agents/"`                                      | Optional; defaults to `agents/`. | Required — declared explicitly even though it matches the default. |
 | `skills`      | `"skills/"`                                      | Optional; defaults to `skills/`. | Required — declared explicitly even though it matches the default. |
 | `hooks`       | `"hooks/hooks.json"`                             | Optional; no default. | Required whenever the plugin ships hooks. |
@@ -144,14 +149,14 @@ Unlike a plugin tree, this file *is* repo-scoped, so `.github/plugin/` is the ri
 | `name` (top-level)      | `"neo"`                               | Required — the marketplace name.          |
 | `owner.name`            | `"skyarkitekten"`                     | Required.                                  |
 | `metadata.description`  | present                               | Required.                                  |
-| `metadata.version`      | `"2.0.4"`                             | Required.                                  |
+| `metadata.version`      | semver string                         | Required.                                  |
 | `plugins[].name`        | `"neo-core"`, `"neo-product"`         | Required — one entry per shipped plugin.   |
 | `plugins[].source`      | `"plugins/neo-core"`                  | Required — repo-root-relative path.        |
 | `plugins[].description` | present                               | Required.                                  |
 | `plugins[].version`     | semver, matching that plugin's `plugin.json` | Required.                           |
 | `plugins[].author.name` | `"Chad Thomas"`                       | Required.                                  |
 | `plugins[].license`     | `"MIT"`                               | Required.                                  |
-| `plugins[].keywords[]`  | 4 entries                             | Required.                                  |
+| `plugins[].keywords[]`  | string array, chosen per plugin (see §3.1) | Required.                             |
 
 **Do not declare `agents`, `skills`, or `hooks` here.** Component paths in a marketplace entry
 are *inert* when the plugin source ships its own `plugin.json` — which every Neo plugin does.
@@ -216,10 +221,17 @@ owned by [`hook-contract.md`](./hook-contract.md).
   `"neo-product"`).
 - `version` — a plugin's `plugin.json` and its `plugins[].version` entry in the marketplace
   must agree. Plugins version **independently** of each other and of `metadata.version`, so
-  `neo-core` and `neo-product` are expected to sit at different numbers.
+  `neo-core` and `neo-product` are expected to sit at different numbers. Both are bumped
+  together automatically after a merge to `main` that touches `plugins/**`:
+  `.github/workflows/version-bump.yml` opens a PR from `scripts/bump-versions.py`, which
+  derives the bump level from the Conventional Commit types of the commits that touched that
+  plugin's directory (`!`/`BREAKING CHANGE` → major, `feat` → minor, anything else → patch),
+  skipping `chore(release)` commits; a plugin no commit touched is not bumped. It does not
+  touch `metadata.version`.
 - `license`, `author.name` / `owner.name` — identity describes one project.
 - `keywords[]` — kept meaningful per manifest.
-- `plugins[].source` — the `./`-prefixed value pointing at the plugin directory.
+- `plugins[].source` — the repo-root-relative path to the plugin directory (e.g.
+  `plugins/neo-core`, no `./` prefix).
 
 ### 3.2 Claude Code (deferred)
 
@@ -270,6 +282,11 @@ walks every `plugins/*/` and fails CI on any allowlist entry that doesn't resolv
 ### Vendored skills
 
 Neo-authored skills carry the `neo-` prefix. A skill **vendored** from an upstream source keeps
-its upstream name unchanged (no `neo-` prefix), since its identity is owned elsewhere. There are
-no vendored skills in `neo-core` today; both current skills (`neo-feature-authoring`,
-`neo-task-authoring`) are Neo-authored.
+its upstream name unchanged (no `neo-` prefix), since its identity is owned elsewhere. Neither
+shipped plugin vendors a skill today; every current skill is Neo-authored. `neo-core` ships
+`neo-evidence-standard`, `neo-feature-authoring`, and `neo-task-authoring`; `neo-product` ships
+`neo-design-thinking`, `neo-evidence-standard`, `neo-product-requirements`, and
+`neo-systems-thinking`. `neo-evidence-standard` is duplicated into both plugins, because
+plugins can't share files (see [§1](#1-plugin-folder-shape), "No cross-plugin file
+references"). The per-plugin inventory lives in
+[`stack-plugin-contract.md` § What ships](./stack-plugin-contract.md#what-ships).

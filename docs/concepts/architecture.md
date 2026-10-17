@@ -73,7 +73,7 @@ Interactive and collaborative between the **BE** and the `task-planner` agent �
 - **Sizing: one task ≈ one PR.** Too big → split; too small (can't stand as its own PR) → fold.
 - **Validation criteria are authored at task creation** and must be machine-checkable — an assertion a test or agent can run to a deterministic pass/fail.
 
-Governed by the `neo-task-authoring` skill (what a clean task _is_) and run by the `task-planner` agent (how to _carve_). Both ship for GitHub Copilot (`.github/`).
+Governed by the `neo-task-authoring` skill (what a clean task _is_) and run by the `task-planner` agent (how to _carve_). Both ship in the `neo-core` plugin (`plugins/neo-core/`).
 
 ### PRD → Feature
 
