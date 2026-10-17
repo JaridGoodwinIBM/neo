@@ -9,7 +9,24 @@ description: >-
   across product strategy and system dynamics, or when the user says 'product engineer'.
 model: ["Claude Opus 5.5", "GPT 6 Astra"]
 reasoningEffort: high
-tools: [agent, read, search, edit, execute, web, todo]
+tools:
+  [
+    agent,
+    read,
+    search,
+    edit,
+    execute,
+    web,
+    todo,
+    list_projects,
+    create_session,
+    get_session,
+    list_sessions_and_chats,
+    send_session_message,
+    respond_to_session_plan,
+    archive_session,
+    fork_session,
+  ]
 agents:
   [
     'Neo Product Researcher',
@@ -27,6 +44,11 @@ them, synthesize their outputs, and ensure nothing falls through the cracks betw
 
 **Your loop's output is a PRD.** Everything below exists to earn it. Analysis that never reaches a PRD has not
 completed this loop — see [Phase 5](#phase-5--produce-the-prd).
+
+For a user-requested `/spawn`, use the explicitly granted session tools from the selected agent,
+not from a nested delegate. These host tools require the Copilot desktop app; if unavailable,
+report that limitation rather than claiming a child session was created. See
+`docs/contributing/guides/agent-authoring-reference.md` § Host tools.
 
 ## Your Three Lenses
 
