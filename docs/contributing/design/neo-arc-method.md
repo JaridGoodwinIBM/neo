@@ -239,18 +239,15 @@ explicit-only — it runs only when asked for by name, never automatically — a
 rather than redefining them. The pipeline is a script instead of orchestrator prose, so these differ from the
 conversational route:
 
-- The workflow, not the Report worker, writes the report (and an optional sibling HTML). The Report worker returns
-  content only. Before any worker runs, the workflow checks `outputPath` validity (including portable
-  filenames), containment in the repository, symlinks and non-regular files. A collision with a different existing
-  file is detected only at write time, after the workers have run, and fails unless `overwrite` is set. HTML with
-  active or external content is rejected by a best-effort check, not a sanitizer.
+- The workflow, not the Report worker, saves the report (and an optional sibling HTML); the Report worker returns
+  content only, and the workflow checks the output path and the HTML before writing.
 - Worker replies are validated against the templates in code, with one retry; the refuter cap (16) is enforced in code.
 - Fact-checking runs three checkers, then at most one correction Report call. Findings whose impact is `yes` or
   `unclear` return `needs_user_decision` and are not applied.
-- The call ceiling is 42 logical calls, 84 attempts with retries (`maxTotalSubagents`); no AI-credit estimate is made.
 
-The conversational Neo Architecture Engineer stays the default entry point. Workflow invocation was verified on
-Copilot CLI 1.0.97 (an invalid question rejected before any worker ran); the full flow has not been live-tested.
+The conversational Neo Architecture Engineer stays the default entry point. The workflow's command, arguments, path
+checks, call ceiling, and verification status are owned by the
+[`neo-arc` README](../../../plugins/neo-arc/README.md#two-ways-to-run-it).
 
 The run figures in [Purpose](#purpose) and [Adaptations and constraints](#adaptations-and-constraints) — agents per run,
 token counts, the share of reuse claims downgraded, the reader schema-failure rate — are the source author's

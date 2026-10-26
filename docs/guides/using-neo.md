@@ -52,18 +52,9 @@ on, a critic names what's missing, and the report is written and fact-checked. Y
 path, the recommended shape, and the **one question that gates the design** — that question, and
 the decisions table, are yours.
 
-Prefer a scripted run? The same assessment is also a separate, **explicit-only** Dynamic Workflow that never
-runs automatically. With `neo-arc` installed and enabled (Copilot may ask you to trust or configure its
-extension), start it by name:
-
-```bash
-copilot --experimental workflow run neo-arc-assessment --args '{"question":"..."}'
-```
-
-It accepts optional `outputPath`, `html`, and `overwrite` args and writes the report itself. Its
-invocation was verified on CLI 1.0.97 (an invalid question is rejected before any worker runs); a full
-end-to-end run has not been live-tested. Options and limits are in the
-[`neo-arc` README](../../plugins/neo-arc/README.md).
+Prefer a scripted run? The same assessment is also a separate, **explicit-only** Dynamic Workflow,
+`neo-arc-assessment`, that never runs automatically. Its command, arguments, limits, and verification status
+are in the [`neo-arc` README](../../plugins/neo-arc/README.md#two-ways-to-run-it).
 
 The loop never edits code, ADRs, or PRDs and never commits. Carry what it recommends into the
 Product loop (step 0) or the Specification loop yourself. A full run is large; ask a narrow
