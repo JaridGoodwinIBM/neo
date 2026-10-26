@@ -24,12 +24,15 @@ The method's design record is
 - **Stages** — a fixed skeleton; the scale knob is the number of readers and refuters, never the shape:
   1. **Scout** — one run; produces the reader brief. Nothing spawns until it exists.
   2. **Readers** — one per area, in parallel (eight to eleven for a full question, plus one for any named external
-     product). **Barrier.**
+     product). **Barrier.** More than half unread stops the run: the evidence is too thin to design from.
   3. **Designers** — three in parallel, one angle each: smallest change; mirror an existing subsystem; first-class.
   4. **Judges** — three in parallel, one lens each: repository maintainer; domain architect; security and governance.
   5. **Synthesizer**, then **refuters** — one per load-bearing reuse claim, in parallel, capped at sixteen, defaulting
-     to "refuted" when unconfirmed. **Barrier.**
-  6. **Critic** — what nobody read, what is unverified or overbuilt, and the sharpest question.
+     to "refuted" when unconfirmed, each handed the reader rows that mention its claim as leads to verify (skipped
+     when the synthesis lists no reuse claims) —
+  6. — and, **at the same time**, the **critic**: what nobody read, what is unverified or overbuilt, and the sharpest
+     question. It works from the synthesis and evidence map, not the verdicts; the report reconciles them.
+     **Barrier.**
   7. **Report**, then **fact-checkers** — three in parallel: repository facts, external claims, document structure.
      Errors and warnings are applied before the report is presented.
 
@@ -67,7 +70,8 @@ non-regular file. A collision with a different existing file is only detected at
 run, and fails unless `overwrite` is `true`. With `html`, the workflow rejects HTML containing scripts, event
 handlers, `javascript:` URLs, embedded elements or external resources; this is a best-effort check, not a
 sanitizer. It runs the same
-Scout → Readers → Designers → Judges → Synthesizer → Refuters → Critic → Report → Factcheck stages, with at most
+Scout → Readers → Designers → Judges → Synthesizer → Refuters and Critic (in parallel) → Report → Factcheck stages,
+with at most
 one correction pass. A finding that could change the recommendation returns `needs_user_decision` instead of being
 applied. The call ceiling is 42 logical calls (84 attempts including one retry each); no cost estimate is made.
 
@@ -87,7 +91,7 @@ applied. The call ceiling is 42 logical calls (84 attempts including one retry e
 | `neo.arc-judge.agent.md` | `Neo Arc Judge` | Scores all designs through one assigned lens | 3, parallel |
 | `neo.arc-synthesizer.agent.md` | `Neo Arc Synthesizer` | Phased recommendation and its load-bearing reuse claims (max 16) | 1 |
 | `neo.arc-refuter.agent.md` | `Neo Arc Refuter` | Tries to break one reuse claim; returns a corrected grade | one per claim, parallel |
-| `neo.arc-critic.agent.md` | `Neo Arc Critic` | Completeness critique and the sharpest question | 1 |
+| `neo.arc-critic.agent.md` | `Neo Arc Critic` | Completeness critique and the sharpest question | 1, alongside the refuters |
 | `neo.arc-report.agent.md` | `Neo Arc Report` | Returns the report content (no file writes), carrying the refuters' corrected grades | 1 |
 | `neo.arc-factcheck.agent.md` | `Neo Arc Factcheck` | Checks the written report for one check kind | 3, parallel |
 

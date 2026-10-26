@@ -18,7 +18,10 @@ the PRD this loop emits is what the BE then segments into features.
 - **Phases** — a default sequence, not a rigid pipeline; research runs in parallel and on
   demand throughout:
   - **Phase 0 — Fan out research** (Intake / Ingest Code & Docs)
-  - **Phase 1–3 — The three lenses**: viability, desirability, feasibility
+  - **Phase 1 — Viability** (Product Coach), gated before any design work
+  - **Phases 2–3 — Desirability and feasibility in parallel** (Design Thinking and Systems
+    Thinking both consume Phase 1's output); their route-back gates are evaluated once both
+    return, with at most one reroute per lens before escalating to the human
   - **Phase 4 — Synthesize**, human gate
   - **Phase 5 — Produce the PRD** — the artifact that leaves this loop
 - **Sub-capabilities** — separate invokable agents the orchestrator delegates to, not prompt

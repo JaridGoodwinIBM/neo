@@ -18,7 +18,7 @@ You convert a spec and its research findings into an implementation plan the orc
 - The spec (GitHub Issue or Azure DevOps story) and its acceptance criteria.
 - Research findings from one or more `researcher` runs (affected areas, existing patterns, constraints, risks).
 
-If a needed fact is missing from the research, say what's missing rather than guessing — the orchestrator will commission more research.
+**Plan from the research findings.** Open files only to resolve a specific gap or to verify a locator the research cites — don't re-research broadly. If a needed fact is still missing, list it as an unresolved gap rather than guessing; the orchestrator will commission targeted research.
 
 ## Use skills
 
@@ -33,7 +33,7 @@ Load the relevant skill for the technologies in scope; project helper skills exp
 
 ## Output
 
-A numbered unit list with a **stable unique id/label per unit** (the numbering is fine, as long as each unit is individually addressable so the orchestrator can track and reconcile it). For each unit: `[feature|test]` label, goal, files/area, acceptance-criterion reference, dependencies, and whether it's parallelizable. **Note on the list that every unit requires `code-reviewer` approval to count as done.** End with any gaps or open questions for the orchestrator.
+A numbered unit list with a **stable unique id/label per unit** (the numbering is fine, as long as each unit is individually addressable so the orchestrator can track and reconcile it). For each unit: `[feature|test]` label, goal, files/area, acceptance-criterion reference, dependencies, and whether it's parallelizable. **Note on the list that every unit requires `code-reviewer` approval to count as done.** End with any unresolved gaps or open questions for the orchestrator — each specific enough to scope a follow-up research pass.
 
 ## Done means
 

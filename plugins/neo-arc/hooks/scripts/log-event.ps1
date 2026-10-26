@@ -15,8 +15,14 @@
   macOS run 'brew install jq' and on Linux 'apt-get install jq'.
 
   Env:
-    AGENT_LOG_DIR  where to write logs   (default: $HOME/.agent-logs)
-    AGENT_RUN_ID   correlation key       (default: current git branch)
+    AGENT_LOG_DIR       where to write logs   (default: $HOME/.agent-logs)
+    AGENT_RUN_ID        correlation key       (default: current git branch;
+                        set it to skip a `git rev-parse` per event)
+    NEO_LOG_TOOL_CALLS  "1" to also log postToolUse (one record per tool call).
+                        Default off: postToolUse exits before any other work,
+                        since it fires on every tool call in every plugin.
+                        Lifecycle events are logged regardless.
+    NEO_LOG_HOOKS       "0" to disable all logging from this script.
 
   NOTE: the field fallbacks below (agent_name, tool_name, ...) are defensive guesses
   across harnesses, mirroring log-event.sh. Verify them against your harness's real
@@ -29,6 +35,15 @@ param(
 
 # Fail-open: nothing here may throw out to the harness.
 $ErrorActionPreference = 'SilentlyContinue'
+
+# Cheap opt-out checks first — before git, date, or the log directory — so a
+# skipped event costs only the pwsh launch. Drain stdin so the harness writing
+# the payload never blocks on a full pipe, then fail open.
+if ($env:NEO_LOG_HOOKS -eq '0' -or ($Event -eq 'postToolUse' -and $env:NEO_LOG_TOOL_CALLS -ne '1')) {
+    try { [void][Console]::In.ReadToEnd() } catch { }
+    Write-Output '{"continue":true}'
+    exit 0
+}
 
 try {
     $logDir = if ($env:AGENT_LOG_DIR) { $env:AGENT_LOG_DIR } else { Join-Path $HOME '.agent-logs' }

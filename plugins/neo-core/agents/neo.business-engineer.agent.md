@@ -28,26 +28,14 @@ user-invocable: true
 argument-hint: <PRD, PRD segment, or feature reference>
 ---
 
-<!-- Tool access. Two families, and they resolve very differently:
-
-     ALIASES — `agent` (delegate to Feature Agent / Task Planner; without it there is no
-     delegation tool), `read`, `edit`, `execute` (shell: `gh` to read and file issues, `git`
-     to inspect branches, `rg`/`curl` because the `search` and `web` aliases resolve to
-     nothing in Copilot CLI).
-
-     HOST TOOLS — everything from `list_projects` down. These are registered by the Copilot
-     desktop app (`src-tauri/src/tools/*.rs`), not by the CLI, and **no alias reaches them**.
-     `execute` grants *shell* session management (`read_powershell`, `stop_powershell`,
-     `list_powershell`) — not app sessions. The only way a custom agent gets `create_session`
-     is to omit `tools:` entirely or to name each tool exactly as written above. Naming them
-     is portable: unrecognized tool names are ignored, so this list degrades harmlessly on the
-     cloud agent and in VS Code — it just loses the ability to spawn there.
-     See `docs/contributing/guides/agent-authoring-reference.md` § Host tools.
-
-     `create_pull_request` / `update_pull_request` are deliberately ABSENT. The guardrail
-     script that would enforce draft-PR-only against those host tools is not registered by
-     default, so granting them here would route around the rule. PRs are opened by the
-     child sessions via `gh pr create --draft`. -->
+<!-- Tool access. ALIASES — `agent` delegates to Feature Agent / Task Planner; `execute` is the
+     shell (`gh` to read and file issues, `git`, and `rg`/`curl`, since `search`/`web` resolve
+     to nothing in Copilot CLI). HOST TOOLS — `list_projects` onward are registered by the
+     desktop app; no alias reaches them (`execute` grants *shell* sessions, not app sessions),
+     so they are named exactly. Unrecognized names are ignored elsewhere, so this is portable.
+     `create_pull_request` / `update_pull_request` are deliberately ABSENT so draft-PR-only
+     can't be routed around; child sessions use `gh pr create --draft`. See
+     `docs/contributing/guides/agent-authoring-reference.md` § Host tools. -->
 
 # Business Engineer
 

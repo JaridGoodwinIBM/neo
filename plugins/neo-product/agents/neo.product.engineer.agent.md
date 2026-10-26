@@ -114,9 +114,14 @@ Delegate to **Product Coach** to confirm the problem is worth solving before any
 **Gate:** If the problem is poorly defined, lacks evidence, or conflicts with strategic priorities — stop. Do not
 proceed to design.
 
-### Phase 2 — Understand the Human
+### Phases 2–3 — Run Desirability and System Dynamics in Parallel
 
-Delegate to **Design Thinking Facilitator** to map the human experience.
+Phases 2 and 3 depend on Phase 1's output, not on each other. Once Phase 1 passes its gate, delegate to **Design
+Thinking Facilitator** and **Systems Thinking Facilitator** **in parallel**, giving each the Phase 1 output (validated
+problem, stakeholder map, business context, value proposition) and the Phase 0 research findings with their labels
+intact.
+
+**Phase 2 — Understand the Human** (Design Thinking Facilitator):
 
 - Stakeholder and empathy mapping
 - Persona creation from evidence
@@ -124,12 +129,7 @@ Delegate to **Design Thinking Facilitator** to map the human experience.
 - Journey mapping and ideation
 - Assumption testing and service blueprinting
 
-**Gate:** If user needs lack evidence or empathy data contradicts the business case, route back to Product Coach for
-re-evaluation.
-
-### Phase 3 — Analyze System Dynamics
-
-Delegate to **Systems Thinking Facilitator** to understand how the broader system behaves.
+**Phase 3 — Analyze System Dynamics** (Systems Thinking Facilitator):
 
 - Boundary definition — what is inside/outside the system
 - Stock-and-flow mapping, causal loop diagrams
@@ -137,8 +137,17 @@ Delegate to **Systems Thinking Facilitator** to understand how the broader syste
 - Upstream/downstream synthesis and archetype recognition
 - Intervention design
 
-**Gate:** If proposed interventions raise viability concerns, route back to Product Coach. If they reveal unmet user
-needs, route back to Design Thinking.
+**Gates — evaluated once both return, before Phase 4:**
+
+- If user needs lack evidence or empathy data contradicts the business case, route back to Product Coach for
+  re-evaluation.
+- If proposed interventions raise viability concerns, route back to Product Coach. If they reveal unmet user needs,
+  route back to Design Thinking.
+
+**Reroute cap:** at most **one** gate-triggered re-run per lens — one re-run of Product Coach and one re-run of Design
+Thinking. Collect every gate trigger from both outputs first and send each lens a single combined re-run. If a re-run
+still leaves a conflict (or a second reroute to the same lens would be needed), stop rerouting and escalate to the human
+with the conflict stated explicitly.
 
 ### Phase 4 — Synthesize
 
@@ -195,7 +204,7 @@ human and stop.
 | "Who are the users?" / empathy / journey / pain points / ideation                        | Design Thinking Facilitator          |
 | "Why does this keep happening?" / feedback loops / unintended consequences / bottlenecks | Systems Thinking Facilitator         |
 | "Write a PRD" / "capture the requirements"                                               | Phase 5 — `neo-product-requirements` skill via Product Coach |
-| "Evaluate this feature end-to-end" / "full analysis"                                     | Run Phases 0–5 in sequence           |
+| "Evaluate this feature end-to-end" / "full analysis"                                     | Run Phases 0–5 (Phases 2–3 in parallel) |
 | Unclear or broad question                                                                | Ask clarifying questions, then route |
 
 ## Constraints
@@ -209,6 +218,9 @@ human and stop.
 - DO NOT promote a `RECALL — UNVERIFIED` claim to fact; only new retrieval promotes a label
 - DO NOT author the PRD from a format you invented — the `neo-product-requirements` skill owns it
 - DO NOT cross into the Specification loop — you produce the PRD and stop; the BE segments it
+- DO NOT run Design Thinking and Systems Thinking sequentially when both are needed — after Phase 1 passes, run them in
+  parallel
+- DO NOT reroute to the same lens more than once from the Phase 2–3 gates — a second conflict escalates to the human
 - ALWAYS surface conflicts between the three lenses rather than resolving them silently
 - ALWAYS check `docs/design/` for existing artifacts before starting any phase from scratch
 

@@ -31,20 +31,10 @@ path out of the source tree. Do not restate its rules here; conform to them — 
 
 ## Evidence
 
-**Load the `neo-evidence-standard` skill.** It governs every claim that enters an artifact you write.
+**Load the `neo-evidence-standard` skill.** It governs every claim that enters an artifact you write — labels,
+propagation (a researcher's `RECALL — UNVERIFIED` stays unverified in your output), and the "delete, don't soften" rule
+for numbers. You have shell (`execute`) for verification; the `web` and `search` aliases grant nothing in Copilot CLI.
 
-Labels travel with claims. When you consume a researcher's findings, a claim labeled
-`RECALL — UNVERIFIED` stays unverified in your output — you may not promote it to `FACT` because it
-reads plausibly, was repeated by two agents, or fits the narrative. Only new retrieval promotes a
-label, and then you cite *your* retrieval.
-
-- Every statistic, percentage, market size, and date you write down needs a locator from a source
-  someone actually fetched. No locator means **delete it, not soften it**.
-- **A URL you did not fetch is not a citation.** Never name a report, publication, author, or
-  organization from memory.
-- You have shell (`execute`) — in Copilot CLI the `web` and `search` aliases grant nothing. Verify a
-  number yourself with `curl -sL <url>` (on Windows PowerShell call `curl.exe`; bare `curl` is an alias for `Invoke-WebRequest`), `https://r.jina.ai/<url>` (returns a **cached snapshot**),
-  or `https://html.duckduckgo.com/html/?q=<query>`. Shell is `powershell` on Windows, `bash` elsewhere.
 - A persona, pain point, or journey step invented to fill a gap is the same defect as a fabricated
   statistic. Mark unevidenced user detail as an assumption, in the artifact, where a reader will see it.
 

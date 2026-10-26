@@ -9,8 +9,14 @@
 # REQUIRES: jq (https://jqlang.github.io/jq/). On macOS, install with: brew install jq
 #
 # Env:
-#   AGENT_LOG_DIR  where to write logs   (default: $HOME/.agent-logs)
-#   AGENT_RUN_ID   correlation key       (default: current git branch)
+#   AGENT_LOG_DIR       where to write logs   (default: $HOME/.agent-logs)
+#   AGENT_RUN_ID        correlation key       (default: current git branch;
+#                       set it to skip a `git rev-parse` per event)
+#   NEO_LOG_TOOL_CALLS  "1" to also log postToolUse (one record per tool call).
+#                       Default off: postToolUse exits before any other work,
+#                       since it fires on every tool call in every plugin.
+#                       Lifecycle events are logged regardless.
+#   NEO_LOG_HOOKS       "0" to disable all logging from this script.
 #
 # NOTE: the jq field paths below are defensive guesses across harnesses.
 # Verify them against your harness's real payload once and trim to what's there.
@@ -18,6 +24,17 @@
 set -o pipefail
 
 EVENT="${1:-unknown}"
+
+# Cheap opt-out checks first — before jq detection, git, date, or mkdir — so a
+# skipped event costs only the bash launch. Drain stdin so the harness writing
+# the payload never takes EPIPE/SIGPIPE, then fail open.
+if [ "${NEO_LOG_HOOKS:-1}" = "0" ] ||
+   { [ "$EVENT" = "postToolUse" ] && [ "${NEO_LOG_TOOL_CALLS:-0}" != "1" ]; }; then
+  cat >/dev/null 2>&1
+  printf '{"continue":true}\n'
+  exit 0
+fi
+
 LOG_DIR="${AGENT_LOG_DIR:-$HOME/.agent-logs}"
 LOG_FILE="$LOG_DIR/events.jsonl"
 RUN_ID="${AGENT_RUN_ID:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)}"

@@ -101,9 +101,11 @@ set**. It cannot sign for you.
 3. **Task → draft PR** `[target for full autonomy]`. Invoke **Neo Technical Engineer** with a Task
    (filed as a GitHub Issue or Azure DevOps story). It branches from the spec (`feat/<issue-id>-<short-name>`),
    then runs research → plan → implement → review and opens a **draft** PR linked to the spec. It
-   pauses twice for you: **`/fleet`** before research and planning, and **`/rubber-duck`** on the plan
-   before implementation. Findings loop back to the writer until the reviewer approves. All work stays
-   on that feature branch; it never commits to `main` and never merges.
+   may pause for you: **`/fleet`** before research when there are more than two research questions,
+   and **`/rubber-duck`** on the plan when it is large (more than three units), spans several areas,
+   or includes a risky unit. You can ask for either at any time. Findings loop back to the writer
+   until the reviewer approves — at most three review rounds per unit before it escalates to you.
+   All work stays on that feature branch; it never commits to `main` and never merges.
 
    Occasionally a Task turns out not to fit in one reviewable PR. When that happens the Technical
    Engineer will tell you and **stack** it: one child session per layer, built bottom-to-top, each

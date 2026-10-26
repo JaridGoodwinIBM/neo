@@ -2,11 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     TEMPLATES,
+    buildCriticPrompt,
+    buildRefuterPrompt,
     buildReportPrompt,
     checkTemplate,
+    claimNeedles,
+    evidenceExcerpt,
+    formatPairedVerdicts,
     nextAttempt,
     normalizeQuestion,
     propagateGrades,
+    readerCoverageFailure,
     startAttempt,
     summarizeCoverage,
 } from "./helpers.mjs";
@@ -237,4 +243,88 @@ test("buildReportPrompt carries the scout reading, designs and judgements the re
     assert.ok(prompt.includes("(no reuse claims)"));
     assert.ok(prompt.includes('{"readers":3}'));
     assert.ok(prompt.includes("not requested; return html as null"));
+});
+
+test("readerCoverageFailure aborts only when more than half of the readers are unread", () => {
+    const ids = ["a", "b", "c", "d"];
+    assert.equal(readerCoverageFailure(ids, []), null);
+    assert.equal(readerCoverageFailure(ids, ["a", "b"]), null);
+    assert.equal(readerCoverageFailure(ids, ["a", "b", "c"]), "3 of 4 reader units failed (more than half; unread: a, b, c); the evidence map is too thin to design from");
+    assert.match(readerCoverageFailure(ids, ids), /no reader produced an accepted output/);
+    assert.equal(readerCoverageFailure(["a", "b", "c"], ["a"]), null);
+    assert.match(readerCoverageFailure(["a", "b", "c"], ["a", "b"]), /^2 of 3 reader units failed/);
+    assert.match(readerCoverageFailure(["a"], ["a"]), /no reader produced/);
+});
+
+test("claimNeedles strips wrapping and line anchors and drops short tokens", () => {
+    assert.deepEqual(claimNeedles({ component: "`Cache`", path: "`src/Cache.ts:10-20`, lib/q.ts#L4" }), [
+        "src/cache.ts",
+        "lib/q.ts",
+        "cache",
+    ]);
+    assert.deepEqual(claimNeedles({ component: "Db", path: "a" }), []);
+    assert.deepEqual(claimNeedles({}), []);
+});
+
+test("evidenceExcerpt returns tagged, de-duplicated matching rows in reader order", () => {
+    const readers = [
+        ["area-1", "## Facts\n- FACT Cache lives at src/cache.ts:10\n- FACT unrelated\n- FACT Cache lives at src/cache.ts:10"],
+        ["area-2", "| CACHE | other.ts | extend |\n| Queue | q.ts | verbatim |"],
+        ["area-3", null],
+    ];
+    assert.equal(
+        evidenceExcerpt(readers, { component: "Cache", path: "src/cache.ts" }),
+        "- [area-1] - FACT Cache lives at src/cache.ts:10\n- [area-2] | CACHE | other.ts | extend |",
+    );
+    assert.equal(evidenceExcerpt(readers, { component: "Nothing", path: "none/here.ts" }), "");
+    assert.equal(evidenceExcerpt(readers, { component: "", path: "" }), "");
+});
+
+test("evidenceExcerpt caps rows, total length and row length", () => {
+    const many = [["r", Array.from({ length: 50 }, (_, i) => `cache row ${i}`).join("\n")]];
+    const capped = evidenceExcerpt(many, { component: "cache", path: "" }, { maxLines: 3 });
+    assert.equal(capped, "- [r] cache row 0\n- [r] cache row 1\n- [r] cache row 2\n- (excerpt truncated)");
+    const sized = evidenceExcerpt(many, { component: "cache", path: "" }, { maxChars: 40 });
+    assert.ok(sized.endsWith("- (excerpt truncated)"));
+    assert.ok(sized.length <= 40 + "\n- (excerpt truncated)".length);
+    const long = evidenceExcerpt([["r", `cache ${"x".repeat(100)}`]], { component: "cache", path: "" }, { maxRowChars: 10 });
+    assert.equal(long, "- [r] cache xxxx…");
+    const defaults = evidenceExcerpt(many, { component: "cache", path: "" });
+    assert.ok(defaults.length <= 4000 + "\n- (excerpt truncated)".length);
+});
+
+test("buildRefuterPrompt carries the claim and the excerpt as leads, or says none were found", () => {
+    const claim = { component: "Cache", path: "src/cache.ts", grade: "extend", how: "new case" };
+    const withRows = buildRefuterPrompt({ question: "Q?", claim, excerpt: "- [area-1] ROW" });
+    for (const part of ["Q?", "- Component: Cache", "- Path: src/cache.ts", "- Grade as claimed: extend", "- How it is reused: new case", "- [area-1] ROW", "leads, not evidence"]) {
+        assert.ok(withRows.includes(part), part);
+    }
+    assert.ok(buildRefuterPrompt({ question: "Q?", claim, excerpt: "" }).includes("(none found in the reader outputs)"));
+});
+
+test("buildCriticPrompt carries the synthesis and evidence map but no refuter verdicts", () => {
+    const prompt = buildCriticPrompt({ question: "Q?", synthesis: "SYNTH", evidenceMap: "EVIDENCE" });
+    for (const part of ["Q?", "SYNTH", "Evidence map:\nEVIDENCE"]) assert.ok(prompt.includes(part), part);
+    assert.ok(!prompt.includes("Refuter verdicts paired"));
+});
+
+test("formatPairedVerdicts describes accepted, failed and over-cap claims", () => {
+    const base = { component: "C", path: "p", originalGrade: "verbatim" };
+    const text = formatPairedVerdicts(
+        [
+            { ...base, id: "claim-1", grade: "extend", verdict: "holds", confidence: "high", refuterStatus: "accepted" },
+            { ...base, id: "claim-2", grade: "verbatim", refuterStatus: "failed" },
+            { ...base, id: "claim-3", grade: "verbatim", refuterStatus: "not-attempted-over-cap" },
+        ],
+        16,
+    );
+    assert.equal(
+        text,
+        [
+            "- claim-1 C (p): claimed verbatim; verdict holds, confidence high, corrected grade extend",
+            "- claim-2 C (p): claimed verbatim; refuter failed twice — refuted, confidence low, corrected grade unverified",
+            "- claim-3 C (p): claimed verbatim; not refuted (over the 16-claim cap) — unverified",
+        ].join("\n"),
+    );
+    assert.equal(formatPairedVerdicts([], 16), "");
 });

@@ -6,7 +6,7 @@ description: >-
   corrected reuse grade in a fixed template. Read-only. Invoked by Neo Architecture Engineer, one per claim in
   parallel, up to sixteen; not for direct use.
 model: ["Claude Sonnet 5.5", "GPT 6.1 Sol"]
-reasoningEffort: high
+reasoningEffort: medium
 tools: [read, search, execute]
 user-invocable: false
 ---
@@ -19,8 +19,11 @@ that does not survive you does not reach the report at its original grade.
 
 ## Input
 
-The orchestrator gives you the question and one claim: component, path, grade, and how it is reused. You deliberately
-do **not** receive the synthesis or the evidence map — read the code fresh.
+The orchestrator gives you the question and one claim: component, path, grade, and how it is reused — plus, when the
+readers mentioned that path or component, the reader rows that did. You deliberately do **not** receive the synthesis
+or the full evidence map. The reader rows are **leads, not evidence**: use them to find the code faster, then open it
+and confirm or break each before you rely on it. A reader row is never a `FACT` in your reply until you have opened the
+`path:line` yourself.
 
 ## Procedure
 
