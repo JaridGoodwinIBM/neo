@@ -92,8 +92,10 @@ applied. The call ceiling is 42 logical calls (84 attempts including one retry e
 | `neo.arc-factcheck.agent.md` | `Neo Arc Factcheck` | Checks the written report for one check kind | 3, parallel |
 
 Angles and lenses are passed in the prompt, not baked into separate agent files, so the same files serve every
-question. Every worker is read-only; only the orchestrator (applying fact-check fixes whose impact on the recommendation is not `yes` or `unclear`; those
-are put to the user) and the report writer edit, and only the report.
+question. Every worker is read-only, the report writer included: it returns the report content and the orchestrator
+saves it (in the workflow route, the workflow does). Only the orchestrator edits a file, and only the report — saving
+it, then applying fact-check fixes whose impact on the recommendation is not `yes` or `unclear` (those are put to the
+user).
 
 The agents are **stack- and project-agnostic**. Layout, conventions, the reports folder, and the governing documents
 come from the consuming repo's `AGENTS.md`, ADRs, and PRDs — never baked into a prompt.

@@ -126,7 +126,7 @@ same route that repo gets its `AGENTS.md`.
 | `arc-synthesizer` | `neo-arc` | |
 | `arc-refuter` | `neo-arc` | One per load-bearing reuse claim, capped at sixteen |
 | `arc-critic` | `neo-arc` | |
-| `arc-report` | `neo-arc` | The only worker that writes a file — the report |
+| `arc-report` | `neo-arc` | Returns the report content; the orchestrator or the `neo-arc-assessment` workflow saves it |
 | `arc-factcheck` | `neo-arc` | Three in parallel, one check kind each |
 | `neo-evidence-standard` skill | `neo-arc` | Copy of `neo-core`'s; keep the copies in step |
 | Lifecycle hooks + `log-event.{sh,ps1}` | `neo-core`, `neo-product`, `neo-arc` | Duplicated, not shared — a plugin cannot reference files outside its own directory |
