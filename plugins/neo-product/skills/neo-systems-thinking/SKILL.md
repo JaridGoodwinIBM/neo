@@ -1,5 +1,5 @@
 ---
-name: neo-system-thinking
+name: neo-systems-thinking
 description:
   'Facilitate systems thinking sessions — map boundaries, stocks and flows, feedback loops, delays, leverage points,
   upstream/downstream dependencies, system archetypes, and intervention design. Use when investigating why problems
@@ -10,7 +10,7 @@ argument-hint:
   'find leverage points in our intake process', 'trace ripple effects of removing the approval gate')"
 ---
 
-# System Thinking
+# Systems Thinking
 
 ## Overview
 

@@ -98,13 +98,15 @@ same route that repo gets its `AGENTS.md`.
 
 | Artifact | Ships in | Notes |
 | --- | --- | --- |
-| `technical-engineer` (orchestrator) | `neo-core` | |
+| `business-engineer` (orchestrator) | `neo-core` | Specification-loop orchestrator; needs the Copilot desktop app |
+| `technical-engineer` (orchestrator) | `neo-core` | Coding-loop orchestrator |
 | `researcher` | `neo-core` | |
 | `implementation-planner` | `neo-core` | |
 | `code-writer` | `neo-core` | Selects stack skills by description, never a hardcoded list |
 | `code-reviewer` | `neo-core` | Same |
 | `feature-agent` | `neo-core` | |
 | `task-planner` | `neo-core` | |
+| `neo-evidence-standard` skill | `neo-core` | Duplicated into `neo-product` and `neo-arc` — a plugin cannot reference files outside its own directory |
 | `neo-feature-authoring` skill | `neo-core` | |
 | `neo-task-authoring` skill | `neo-core` | |
 | `product.engineer` (orchestrator) | `neo-product` | Entry point for the Product loop |
@@ -114,7 +116,8 @@ same route that repo gets its `AGENTS.md`.
 | `systems.thinking` | `neo-product` | Feasibility lens |
 | `neo-product-requirements` skill | `neo-product` | Owns the PRD artifact and template |
 | `neo-design-thinking` skill | `neo-product` | |
-| `neo-system-thinking` skill | `neo-product` | Directory name is singular; the agent is `systems.thinking` |
+| `neo-systems-thinking` skill | `neo-product` | |
+| `neo-evidence-standard` skill | `neo-product` | Copy of `neo-core`'s; keep the copies in step |
 | `architecture-engineer` (orchestrator) | `neo-arc` | Entry point for the Architecture Assessment loop |
 | `arc-scout` | `neo-arc` | Writes the reader brief; runs first |
 | `arc-reader` | `neo-arc` | Fanned out in parallel, one area each |
@@ -125,8 +128,9 @@ same route that repo gets its `AGENTS.md`.
 | `arc-critic` | `neo-arc` | |
 | `arc-report` | `neo-arc` | The only worker that writes a file — the report |
 | `arc-factcheck` | `neo-arc` | Three in parallel, one check kind each |
-| `neo-evidence-standard` skill | `neo-core`, `neo-product`, `neo-arc` | Duplicated, not shared |
-| Lifecycle hooks + `log-event.sh` | `neo-core`, `neo-product`, `neo-arc` | Duplicated, not shared — a plugin cannot reference files outside its own directory |
+| `neo-evidence-standard` skill | `neo-arc` | Copy of `neo-core`'s; keep the copies in step |
+| Lifecycle hooks + `log-event.{sh,ps1}` | `neo-core`, `neo-product`, `neo-arc` | Duplicated, not shared — a plugin cannot reference files outside its own directory |
+| `enforce-guardrails.{sh,ps1}` | `neo-core`, `neo-product`, `neo-arc` | Opt-in `preToolUse` guardrail scripts, shipped unregistered; duplicated like the logger |
 | `analyze_agent_logs.py` | `neo-core` | Analyzes logs the core hooks emit — ships with them |
 | **`master-control`** | **nothing** | Dev-time only |
 | Stack skills (React, xUnit, Bicep, …) | `neo-<stack>` | Mostly not yet authored |
@@ -195,8 +199,9 @@ Bad: `React skill — helps with React code.`
 Good: `Use when writing or reviewing React components — .tsx/.jsx files, hooks, component state,
 props, or context. Implementation-phase skill; see the testing skill for component tests.`
 
-This format ships as a `neo-stack-skill-authoring` skill in `neo-core`, so the contract is
-enforceable by the same mechanism as `neo-task-authoring` and `neo-feature-authoring`. It cannot
+This format is intended to ship as a `neo-stack-skill-authoring` skill in `neo-core` (planned,
+not yet authored), so the contract becomes enforceable by the same mechanism as
+`neo-task-authoring` and `neo-feature-authoring`. It cannot
 be a shared file stack plugins import — [no cross-plugin file references](./plugin-contract.md#1-plugin-folder-shape)
 means the core↔stack contract has to be documentation plus an in-core skill, not a shared schema.
 

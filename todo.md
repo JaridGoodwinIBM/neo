@@ -13,7 +13,7 @@ the **Copilot-only decision** (#34, PR #36/#37) that dropped the Claude agent tr
 Since then: `preToolUse` enforcement shipped (#42, PR #44) and was later withdrawn from the
 shipped manifests (#95 — the scripts remain, opt-in), and the **Product loop** shipped
 as a second plugin, `neo-product` (PR #70, plus `product.researcher` in PR #71) — five agents
-and three skills producing a PRD upstream of the Specification loop.
+and four skills producing a PRD upstream of the Specification loop.
 
 ## Where the work is tracked
 

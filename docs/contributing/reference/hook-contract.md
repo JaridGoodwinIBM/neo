@@ -153,7 +153,9 @@ The two hook sets deliberately differ, and each guide owns the detail:
   allow). An **unparseable** payload is the one exception: it allows with a stderr warning
   rather than bricking the session. This contract is why Neo ships the enforcement scripts
   **unregistered** — the failure mode belongs to the consuming repo that chooses to accept
-  it. See [`guides/enforcement.md`](../guides/enforcement.md).
+  it. The opt-in hook command wraps the script so a non-zero exit (infrastructure failure)
+  allows with a warning while a real deny still blocks — see
+  [`guides/enforcement.md`](../guides/enforcement.md) § Opting in.
 
 ## Handling sensitive payloads
 

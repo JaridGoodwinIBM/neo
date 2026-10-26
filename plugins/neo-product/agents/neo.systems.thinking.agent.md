@@ -21,7 +21,7 @@ consequences.
 
 ## Skills
 
-Every systems analysis you run must satisfy the **neo-system-thinking** skill. Load it. Do not restate its rules here;
+Every systems analysis you run must satisfy the **neo-systems-thinking** skill. Load it. Do not restate its rules here;
 conform to them — it owns the phase routing (boundary definition → stock-and-flow mapping → causal loop mapping →
 delay analysis → leverage point analysis → upstream/downstream synthesis → archetype recognition → intervention
 design), output locations, and constraints.

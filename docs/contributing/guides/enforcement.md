@@ -53,8 +53,9 @@ All three produced a non-zero exit, and a non-zero exit on `preToolUse` denies t
 
 Spending that failure mode on weak, redundant enforcement of someone else's policy is a bad
 trade. So the scripts stay in-tree, unregistered, and a team that wants the behavior opts in
-below. `scripts/validate-plugins.py` fails the build if a shipped plugin registers
-`preToolUse` again.
+below — with a wrapper that turns those infrastructure failures into allow-with-warning
+instead of a blanket denial. `scripts/validate-plugins.py` fails the build if a shipped plugin
+registers `preToolUse` again.
 
 ## Files
 
@@ -90,19 +91,22 @@ survives a plugin uninstall or version bump.
   "hooks": {
     "preToolUse": [
       { "type": "command",
-        "bash": "r=\"$(git rev-parse --show-toplevel 2>/dev/null)\"; s=\"$r/.github/hooks/scripts/enforce-guardrails.sh\"; [ -n \"$r\" ] && [ -f \"$s\" ] || exit 0; bash \"$s\" preToolUse",
-        "powershell": "$r = (git rev-parse --show-toplevel 2>$null); $s = \"$r/.github/hooks/scripts/enforce-guardrails.ps1\"; if (-not $r -or -not (Test-Path -LiteralPath $s)) { exit 0 }; pwsh -NoProfile -ExecutionPolicy Bypass -File \"$s\" preToolUse",
+        "bash": "r=\"$(git rev-parse --show-toplevel 2>/dev/null)\"; s=\"$r/.github/hooks/scripts/enforce-guardrails.sh\"; [ -n \"$r\" ] && [ -f \"$s\" ] || exit 0; o=\"$(bash \"$s\" preToolUse)\"; c=$?; if [ \"$c\" -eq 0 ]; then [ -z \"$o\" ] || printf '%s\\n' \"$o\"; else printf 'Neo enforce-guardrails: hook exited %s; allowing (fail-open).\\n' \"$c\" >&2; fi; exit 0",
+        "powershell": "$r = (git rev-parse --show-toplevel 2>$null); $s = \"$r/.github/hooks/scripts/enforce-guardrails.ps1\"; if (-not $r -or -not (Test-Path -LiteralPath $s)) { exit 0 }; $c = 127; $o = @(); try { $o = @(pwsh -NoProfile -ExecutionPolicy Bypass -File \"$s\" preToolUse); $c = $LASTEXITCODE } catch { }; if ($c -eq 0) { if ($o) { $o -join \"`n\" } } else { [Console]::Error.WriteLine(\"Neo enforce-guardrails: hook exited $c; allowing (fail-open).\") }; exit 0",
         "timeoutSec": 10 }
     ]
   }
 }
 ```
 
-Three parts of that command matter, and the first two exist because their absence shipped a
-broken release. Keep them if you adapt it:
+The command is a **fail-open wrapper** around the script: a real deny still blocks, but an
+infrastructure failure allows the call with a warning instead of denying every tool call. Four
+parts of it matter, and the first two exist because their absence shipped a broken release.
+Keep them if you adapt it:
 
-- **The existence guard.** If the path does not resolve, `exit 0` rather than letting the
-  shell exit non-zero and deny everything.
+- **The existence guard.** If the path does not resolve, `exit 0` rather than running a
+  nonexistent script. The wrapper would turn the resulting failure into allow-with-warning
+  anyway, but the guard keeps the missing-file case quiet and is still worth keeping.
 - **The explicit interpreter, on both platforms.** The existence guard proves the file is there;
   it does not prove the OS will run it. On Windows, `& $s` runs a script file, which PowerShell
   execution policy governs, and the harness passes no `-ExecutionPolicy` flag. `-ExecutionPolicy
@@ -116,8 +120,35 @@ broken release. Keep them if you adapt it:
   misses, the existence guard fires and enforcement is **silently off**. `git rev-parse
   --show-toplevel` anchors it. (The scripts themselves already resolve the branch against the
   *payload's* `cwd`, not the process's, for the same reason.)
+- **The exit-code wrapper.** The scripts exit 0 on every verdict (deny is JSON on stdout plus
+  exit 0; allow is empty stdout plus exit 0), so a **non-zero exit only ever means
+  infrastructure failure** — a missing interpreter, an execution policy or GPO refusal, CRLF
+  endings, a syntax error, a crash or kill. That is why the wrapper can tell the two apart
+  without swallowing a real verdict:
+  - Child exits 0 → its stdout is passed through verbatim, so a real deny still blocks.
+  - Child exits non-zero → any partial stdout is discarded, one line
+    `Neo enforce-guardrails: hook exited N; allowing (fail-open).` goes to stderr, and the
+    wrapper exits 0.
+  - The PowerShell form wraps the launch in `try`/`catch` and seeds `$c = 127`, so a failed
+    launch (where `$LASTEXITCODE` is never read) reports a real exit code in the warning
+    instead of an empty one. It fails open either way; the sentinel only makes the message
+    useful.
+  - **Trade-off:** a crash that would have denied now allows, with a warning. Enforcement fails
+    *off*, visibly only on stderr. That is acceptable because this is a speed bump backed by
+    server-side branch protection (see § Why they are opt-in).
+  - **Strict alternative:** drop the wrapper and run `bash "$s" preToolUse` /
+    `pwsh -NoProfile -ExecutionPolicy Bypass -File "$s" preToolUse` directly. Every non-zero
+    exit then denies, so any launch failure or crash denies every tool call.
+  - If the child exits 0 with non-JSON stdout, the wrapper passes it through unchanged (the Neo
+    scripts never do this).
 
-Measured exit codes, same script, same machine. Windows, by effective execution policy:
+Keep the bash and PowerShell strings in sync if you adapt either. The nested `pwsh` launch in
+the PowerShell form adds a few hundred ms per call, well inside `timeoutSec: 10`.
+
+The tables below are **child** exit codes: the same script on the same machine, run under each
+launch form shown in the column headers. In the wrapped form any non-zero becomes
+allow-with-warning (enforcement off, with a stderr warning); the "denies everything" labels
+describe the strict, unwrapped form. Windows, by effective execution policy:
 
 | Effective policy | `& $s` | `pwsh -ExecutionPolicy Bypass -File "$s"` |
 | --- | --- | --- |
@@ -135,15 +166,18 @@ POSIX, by file state:
 | CRLF line endings | **127 — denies everything** | **2 — denies everything** |
 
 The last row is the exception that proves the rule: an explicit interpreter cannot rescue CRLF,
-because bash itself chokes on the `\r`. That is why `*.sh text eol=lf` in `.gitattributes` is
-load-bearing rather than cosmetic, and why it matters that this repo is developed on Windows.
+because bash itself chokes on the `\r`. With the wrapper, CRLF disables the guardrail (allow plus
+a stderr warning) rather than bricking the session, so `*.sh text eol=lf` in `.gitattributes`
+is still load-bearing rather than cosmetic, and still matters because this repo is developed on
+Windows.
 
 > **`-ExecutionPolicy` does not beat Group Policy.** The flag sets the **Process** scope, which
 > ranks below `MachinePolicy` and `UserPolicy`. On a machine where an administrator has set the
 > *Turn on Script Execution* GPO to `AllSigned` — or disabled it, equivalent to `Restricted` —
 > an unsigned script still refuses to load and the hook still exits non-zero. The table above was
 > measured across the process/user/machine scopes, not the GPO ones. On such a machine the shipped
-> logging hooks merely fail open (they log nothing), but a `preToolUse` hook you opt into would
+> logging hooks merely fail open (they log nothing); with the wrapper, a `preToolUse` hook you opt
+> into allows every call with a stderr warning (enforcement is off), whereas the strict form would
 > deny every tool call. If you are on GPO-managed Windows, sign the scripts or verify before you
 > rely on them — which § Verify tells you to do anyway.
 
@@ -164,7 +198,8 @@ Verified against GitHub's [Copilot hooks reference](https://docs.github.com/en/c
   like the logger:**
   - Command `preToolUse` hooks are **fail-closed on error**: any crash or **non-zero exit,
     including exit `2`**, denies the call — even if stdout says `allow`. The hook therefore
-    always `exit 0` and expresses its verdict purely through the JSON.
+    always `exit 0` and expresses its verdict purely through the JSON. This is also why the
+    opt-in wrapper always exits 0.
   - Command hook **timeouts always fail open** (the tool proceeds). This is unavoidable, so
     the hook is kept fast and dependency-light and `timeoutSec` is `10`.
 
@@ -214,19 +249,22 @@ string** — they would sail straight past the command patterns.
 | Non-shell tool | allow |
 | Payload unparseable (or `python3` absent on Unix) | allow + stderr warning |
 | Host-tool `toolArgs` present but unreadable (not JSON, not an object) | allow + stderr warning |
+| Script exits 0 with deny JSON | **deny** (wrapper passes it through) |
 | Hook script missing at the wired path | allow (existence guard in the hook command) |
-| Interpreter, execution policy, or a missing executable bit refuses to run the script | **deny — must be prevented, not handled** |
-| Script present but crashes | **deny** |
+| Interpreter, execution policy, or a missing executable bit refuses to run the script | allow + stderr warning (wrapper); **deny** in the strict form |
+| Script present but crashes | allow + stderr warning (wrapper); **deny** in the strict form |
 | Hook times out | allow (harness fail-open) |
 
 The unparseable case is a **deliberate** fail-open inside the script: denying every tool call
 on a parser glitch would brick the session, and branch protection is the real backstop.
 
-The two **deny** rows are the dangerous ones, and neither can be fixed from inside the script
-— by definition the script is not running. They can only be prevented by the hook command
-itself, which is why the opt-in snippet above carries both the existence guard and the
-explicit interpreter. A crashing script still fails closed; nothing in the command can
-distinguish "crashed" from "ran and denied" without also being able to swallow a real verdict.
+The two launch-failure and crash rows are the dangerous ones, and neither can be fixed from
+inside the script — by definition the script is not running or has died. Only the hook command
+can handle them, which is why the opt-in snippet carries the existence guard, the explicit
+interpreter, and the exit-code wrapper. The scripts exit 0 on every verdict, so a non-zero exit
+always means infrastructure failure, never "ran and denied". That is what lets the wrapper
+convert a crash into allow-with-warning without swallowing a real verdict. Without the wrapper
+(the strict form), a crashing script fails closed.
 
 ## Relaxing enforcement
 
@@ -236,7 +274,7 @@ observability set (#4):
 - **Neo escape hatch:** set `NEO_ENFORCE_GUARDRAILS=0` (also `off`/`false`/`no`) to make the
   hook allow everything. Use it for legitimate exceptions (e.g. a maintenance task that must
   touch `main`). Note this only works when the script **runs** — it cannot rescue a hook that
-  failed to launch.
+  failed to launch (with the wrapper, a failed launch already allows with a warning).
 - **`disableAllHooks`** — turns off all repo/user/plugin hooks for the session (policy hooks
   excepted). Broader than the escape hatch: it also disables observability logging.
 - **`.github/copilot/settings.local.json`** — a typically-gitignored, user-specific settings
@@ -253,12 +291,14 @@ lever and leaves observability logging intact.
 
 ## Verify
 
-Pipe a sample payload through the hook and check the decision:
+Pipe a sample payload through the hook and check the decision. The comments show the shape of
+the output, not its exact bytes: the bash script prints the JSON with a space after each colon
+and comma, the PowerShell script prints it compact.
 
 ```bash
 printf '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
-# => {"permissionDecision":"deny","permissionDecisionReason":"Neo guardrail: pushing to 'main'…"}
+# => {"permissionDecision": "deny", "permissionDecisionReason": "Neo guardrail: pushing to 'main'…"}
 
 printf '{"toolName":"bash","toolArgs":{"command":"gh pr create --draft"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
@@ -266,32 +306,79 @@ printf '{"toolName":"bash","toolArgs":{"command":"gh pr create --draft"}}' \
 
 printf '{"toolName":"create_pull_request","toolArgs":{"title":"x"}}' \
   | hooks/scripts/enforce-guardrails.sh preToolUse
-# => {"permissionDecision":"deny","permissionDecisionReason":"Neo guardrail: agents open DRAFT…"}
+# => {"permissionDecision": "deny", "permissionDecisionReason": "Neo guardrail: agents open DRAFT…"}
 ```
 
 Test the **whole hook command**, not just the script — the failure this page exists to prevent
-lives in the command, not the script.
+lives in the command, not the script. The snippets below are the unescaped forms of the wrapped
+command from § Opting in, so run them from inside the repo that vendored the scripts (the
+command anchors on `git rev-parse --show-toplevel`). Each expects the **deny JSON and exit 0**,
+then a **fail-open check** against a child that exits non-zero.
 
 On Windows:
 
 ```powershell
-$cmd = '$s = ".github/hooks/scripts/enforce-guardrails.ps1"; if (-not (Test-Path -LiteralPath $s)) { exit 0 }; pwsh -NoProfile -ExecutionPolicy Bypass -File "$s" preToolUse'
+$cmd = '$r = (git rev-parse --show-toplevel 2>$null); $s = "$r/.github/hooks/scripts/enforce-guardrails.ps1"; if (-not $r -or -not (Test-Path -LiteralPath $s)) { exit 0 }; $c = 127; $o = @(); try { $o = @(pwsh -NoProfile -ExecutionPolicy Bypass -File "$s" preToolUse); $c = $LASTEXITCODE } catch { }; if ($c -eq 0) { if ($o) { $o -join "`n" } } else { [Console]::Error.WriteLine("Neo enforce-guardrails: hook exited $c; allowing (fail-open).") }; exit 0'
 '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' |
   pwsh -nop -nol -ExecutionPolicy Restricted -c $cmd
-# => the deny JSON, and exit code 0. A non-zero exit here means every tool call will be denied.
+$LASTEXITCODE
+# => the deny JSON, and exit code 0.
 ```
 
 `-ExecutionPolicy Restricted` on the outer process reproduces the stock-Windows-client
-condition, because process scope is inherited by children unless they set their own.
+condition, because process scope is inherited by children unless they set their own. The
+wrapped command still prints the deny JSON, since the inner `pwsh` sets its own `Bypass`.
 
-On macOS or Linux, reproduce the equivalent condition by stripping the executable bit:
+Fail-open check, reusing `$cmd` from above — swap in a child that exits non-zero, then restore
+it. If you interrupt this block, restore the script yourself with `Move-Item -Force "$s.bak" $s`,
+or the vendored guardrail stays stubbed out:
+
+```powershell
+$s = "$(git rev-parse --show-toplevel)/.github/hooks/scripts/enforce-guardrails.ps1"
+Copy-Item $s "$s.bak"; Set-Content $s 'exit 3'
+'{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' |
+  pwsh -nop -nol -c $cmd
+$LASTEXITCODE
+Move-Item -Force "$s.bak" $s
+# => empty stdout, "Neo enforce-guardrails: hook exited 3; allowing (fail-open)." on stderr,
+#    exit code 0. The strict (unwrapped) form would exit 3 here and deny the call.
+```
+
+On macOS or Linux, the command contains single quotes, so load it with a quoted heredoc rather
+than a single-quoted string:
+
+```bash
+cmd=$(cat <<'EOF'
+r="$(git rev-parse --show-toplevel 2>/dev/null)"; s="$r/.github/hooks/scripts/enforce-guardrails.sh"; [ -n "$r" ] && [ -f "$s" ] || exit 0; o="$(bash "$s" preToolUse)"; c=$?; if [ "$c" -eq 0 ]; then [ -z "$o" ] || printf '%s\n' "$o"; else printf 'Neo enforce-guardrails: hook exited %s; allowing (fail-open).\n' "$c" >&2; fi; exit 0
+EOF
+)
+printf '%s' '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' | bash -c "$cmd"
+echo "exit=$?"
+# => the deny JSON, and exit=0.
+```
+
+Fail-open check, reusing `cmd` from above — swap in a child that exits non-zero, then restore
+it. If you interrupt this block, restore the script yourself with `mv "$s.bak" "$s"`, or the
+vendored guardrail stays stubbed out:
+
+```bash
+s="$(git rev-parse --show-toplevel)/.github/hooks/scripts/enforce-guardrails.sh"
+cp "$s" "$s.bak"; printf 'exit 3\n' > "$s"
+printf '%s' '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' | bash -c "$cmd"
+echo "exit=$?"
+mv "$s.bak" "$s"
+# => empty stdout, "Neo enforce-guardrails: hook exited 3; allowing (fail-open)." on stderr,
+#    exit=0. The strict (unwrapped) form would exit 3 here and deny the call.
+```
+
+To reproduce the macOS lost-executable-bit condition, strip the bit and rerun the first check:
 
 ```bash
 chmod 644 .github/hooks/scripts/enforce-guardrails.sh
-cmd='s=".github/hooks/scripts/enforce-guardrails.sh"; [ -f "$s" ] || exit 0; bash "$s" preToolUse'
-printf '%s' '{"toolName":"bash","toolArgs":{"command":"git push origin main"}}' | bash -c "$cmd"
-echo "exit=$?"
-# => the deny JSON, and exit=0. Swapping `bash "$s"` for a bare `"$s"` here gives exit=126,
-#    which is the macOS blanket-denial bug.
+# => still the deny JSON and exit=0, because `bash "$s"` does not need the executable bit.
+#    A bare `"$s"` would exit 126: allow + warning in the wrapped form, a blanket denial in
+#    the strict form (the macOS bug).
 ```
+
+Then restore the bit: `chmod 755 .github/hooks/scripts/enforce-guardrails.sh`
 

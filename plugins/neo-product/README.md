@@ -46,9 +46,10 @@ consuming repo's `AGENTS.md`, PRDs, ADRs, and design docs — never baked into a
 
 | Skill | Owns |
 | --- | --- |
+| `neo-evidence-standard` | The retrieval-or-silence rule and the `FACT`/`INFERENCE`/`RECALL` labels. A copy of `neo-core`'s — keep the two in step |
 | `neo-product-requirements` | PRD structure, the drafting procedure, and `assets/prd-template.md`. **Normative** — Phase 5 does not improvise a format |
 | `neo-design-thinking` | Stakeholder/empathy mapping, personas, problem framing, journey mapping, ideation, assumption testing, service blueprinting |
-| `neo-system-thinking` | Boundaries, stocks and flows, causal loops, delays, leverage points, archetypes, intervention design |
+| `neo-systems-thinking` | Boundaries, stocks and flows, causal loops, delays, leverage points, archetypes, intervention design |
 
 **Hooks** (`hooks/hooks.json`, v1 schema, `${PLUGIN_ROOT}`): the same registered fail-open
 observability logging, and the same **unregistered, opt-in** guardrail scripts, as
