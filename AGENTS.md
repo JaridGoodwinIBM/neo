@@ -91,6 +91,9 @@ This repo has nothing to compile, lint, or unit-test in the app sense. Do **not*
   bare `${PLUGIN_ROOT}`), rejects non-canonical hook event names, and fails on any `agents:`
   allowlist entry that doesn't resolve to a real agent `name:`. CI runs it via
   `.github/workflows/validate.yml`.
+- **Script and extension tests pass** — if you touched `scripts/validate-plugins.py` or a plugin
+  extension, run `python3 -m unittest discover -s scripts/tests` and
+  `node --test 'plugins/*/extensions/**/*.test.mjs'` (Node 22+). CI runs both.
 - **Plugins actually load.** Static validation can't prove a component reached the CLI. If you
   touched a manifest or moved a component, install into a throwaway `COPILOT_HOME` and read
   what the CLI reports:
