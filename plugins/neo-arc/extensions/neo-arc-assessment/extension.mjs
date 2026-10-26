@@ -4,13 +4,18 @@ import {
     FACTCHECK_KINDS,
     REUSE_GRADES,
     TEMPLATES,
+    buildCriticPrompt,
+    buildRefuterPrompt,
     buildReportPrompt,
     checkTemplate,
     classifyFindings,
     deriveReportPath,
+    evidenceExcerpt,
+    formatPairedVerdicts,
     htmlCompanionPath,
     nextAttempt,
     propagateGrades,
+    readerCoverageFailure,
     startAttempt,
     summarizeCoverage,
     validateReportArgs,
@@ -38,11 +43,13 @@ const AGENTS = {
     factcheck: "neo-arc:neo.arc-factcheck",
 };
 
-const STEP_VERSION = "assessment-v1";
+// Bumped whenever step ordering or step inputs change, so a resumed run never replays journaled steps from an older
+// pipeline shape. v2: the Critic runs concurrently with the Refuters and no longer receives their verdicts.
+const STEP_VERSION = "assessment-v2";
 const MAX_REFUTERS = 16;
 // 1 Scout + up to 12 Readers (11 areas + external) + 3 Designers + 3 Judges + 1 Synthesizer + 16 Refuters + 1 Critic
-// + 1 Report + 3 Factcheckers + at most 1 correction Report = 42 logical calls, each with at most one retry
-// (manual for template workers, the SDK schema retry for Report).
+// (concurrent with the Refuters, but still counted) + 1 Report + 3 Factcheckers + at most 1 correction Report = 42
+// logical calls, each with at most one retry (manual for template workers, the SDK schema retry for Report).
 const MAX_LOGICAL_CALLS = 1 + 12 + 3 + 3 + 1 + MAX_REFUTERS + 1 + 1 + 3 + 1;
 const MAX_TOTAL_SUBAGENTS = MAX_LOGICAL_CALLS * 2;
 
@@ -154,7 +161,8 @@ const neoArcAssessment = defineWorkflow({
         description:
             "Explicit-only: run only when the user asks for the neo-arc-assessment workflow by name. " +
             "Neo Arc assessment, Scout through Factcheck/correction: " +
-            "Scout → Readers → 3 Designers → 3 Judges → Synthesizer → Refuters (max 16 reuse claims) → Critic → Report → " +
+            "Scout → Readers (aborts when more than half fail) → 3 Designers → 3 Judges → Synthesizer → " +
+            "Refuters (max 16 reuse claims; skipped when there are none) concurrently with the Critic → Report → " +
             "Factcheck (3 checkers in parallel: repository facts, external claims, document structure; at most one correction Report call). " +
             "The workflow itself writes the report Markdown (and an optional sibling HTML) under docs/design/assessments/; " +
             "the Report worker returns content only. Errors and warnings that cannot change the recommendation are corrected once; " +
@@ -172,8 +180,7 @@ const neoArcAssessment = defineWorkflow({
             { title: "Designers" },
             { title: "Judges" },
             { title: "Synthesizer" },
-            { title: "Refuters" },
-            { title: "Critic" },
+            { title: "Refuters and Critic" },
             { title: "Report" },
             { title: "Factcheck" },
         ],
@@ -303,9 +310,11 @@ const neoArcAssessment = defineWorkflow({
         const readerOutputs = acceptedOutputs(readerResults);
         outputs.readers = readerOutputs;
         const unreadIds = readerUnits.filter((u) => !(u.id in readerOutputs)).map((u) => u.id);
-        if (unreadIds.length === readerUnits.length) {
-            return fail("readers", "no reader produced an accepted output; there is no evidence to design from");
-        }
+        const readerFailure = readerCoverageFailure(
+            readerUnits.map((u) => u.id),
+            unreadIds,
+        );
+        if (readerFailure) return fail("readers", readerFailure);
         const evidenceMap =
             readerUnits
                 .filter((u) => u.id in readerOutputs)
@@ -362,22 +371,36 @@ const neoArcAssessment = defineWorkflow({
         outputs.synthesizer = synth.output;
         claims = parseReuseClaims(synth.output).claims;
 
-        // Refuters
-        ctx.phase("Refuters");
+        // Refuters and Critic run in one parallel batch: the Critic needs only the synthesis and the evidence map, and
+        // the Report worker reconciles its critique with the refuters' verdicts. With no reuse claims the batch is just
+        // the Critic and no refuter stage is recorded.
+        ctx.phase("Refuters and Critic");
         const toRefute = claims.slice(0, MAX_REFUTERS);
         refuterInfo.attempted = toRefute.length;
         refuterInfo.dropped = claims.length - toRefute.length;
-        const refuterResults = await runParallel(ctx, toRefute, (claim) =>
-            runWorker(ctx, {
-                role: "refuter",
-                item: claim.id,
-                prompt:
-                    `Question:\n${question}\n\nReuse claim to refute:\n- Component: ${claim.component}\n- Path: ${claim.path}\n` +
-                    `- Grade as claimed: ${claim.grade}\n- How it is reused: ${claim.how}`,
-                validate: parseRefuterVerdict,
-            }),
+        const readerEvidence = readerUnits.filter((u) => u.id in readerOutputs).map((u) => [u.id, readerOutputs[u.id]]);
+        const CRITIC_ID = "critic";
+        const batch = [...toRefute.map((claim) => ({ id: claim.id, claim })), { id: CRITIC_ID }];
+        const batchResults = await runParallel(ctx, batch, (unit) =>
+            unit.claim
+                ? runWorker(ctx, {
+                      role: "refuter",
+                      item: unit.claim.id,
+                      prompt: buildRefuterPrompt({
+                          question,
+                          claim: unit.claim,
+                          excerpt: evidenceExcerpt(readerEvidence, unit.claim),
+                      }),
+                      validate: parseRefuterVerdict,
+                  })
+                : runWorker(ctx, {
+                      role: "critic",
+                      item: CRITIC_ID,
+                      prompt: buildCriticPrompt({ question, synthesis: outputs.synthesizer, evidenceMap }),
+                  }),
         );
-        record("refuter", toRefute.map((c) => c.id), refuterResults);
+        const refuterResults = Object.fromEntries(toRefute.map((c) => [c.id, batchResults[c.id]]));
+        if (toRefute.length > 0) record("refuter", toRefute.map((c) => c.id), refuterResults);
         const verdicts = {};
         const refuterOutputs = {};
         for (const claim of toRefute) {
@@ -396,29 +419,10 @@ const neoArcAssessment = defineWorkflow({
             // A refuter that failed twice leaves the claim unconfirmed, so it does not hold.
             return { ...c, verdict: "refuted", confidence: "low", refuterStatus: "failed" };
         });
+        const pairedVerdicts = formatPairedVerdicts(claims, MAX_REFUTERS);
 
-        // Critic
-        ctx.phase("Critic");
-        const pairedVerdicts = claims
-            .map((c) => {
-                const head = `- ${c.id} ${c.component} (${c.path}): claimed ${c.originalGrade}`;
-                if (c.refuterStatus === "not-attempted-over-cap") {
-                    return `${head}; not refuted (over the ${MAX_REFUTERS}-claim cap) — unverified`;
-                }
-                if (c.refuterStatus === "failed") {
-                    return `${head}; refuter failed twice — refuted, confidence low, corrected grade unverified`;
-                }
-                return `${head}; verdict ${c.verdict}, confidence ${c.confidence}, corrected grade ${c.grade}`;
-            })
-            .join("\n");
-        const critic = await runWorker(ctx, {
-            role: "critic",
-            item: "critic",
-            prompt:
-                `Question:\n${question}\n\nSynthesis:\n${outputs.synthesizer}\n\nRefuter verdicts paired with their claims:\n` +
-                `${pairedVerdicts || "(no reuse claims)"}\n\nEvidence map:\n${evidenceMap}`,
-        });
-        record("critic", ["critic"], { critic });
+        const critic = batchResults[CRITIC_ID];
+        record("critic", [CRITIC_ID], { critic });
         if (critic.status !== "accepted") return fail("critic", failureText("critic", critic));
         outputs.critic = critic.output;
 

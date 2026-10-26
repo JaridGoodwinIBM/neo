@@ -475,8 +475,139 @@ export function buildReportPrompt({
         `What the question means (the scout's reading of ambiguous terms):\n${questionMeaning || "(none)"}\n\n` +
         `The three designs:\n${designs}\n\nThe three judgements:\n${judgements}\n\n` +
         `Synthesis:\n${synthesis}\n\nRefuter verdicts paired with their claims:\n${pairedVerdicts || "(no reuse claims)"}\n\n` +
-        `Critique:\n${critique}\n\nRun log (JSON):\n${JSON.stringify(coverage)}\n\n` +
+        `Critique (written alongside the refuters, without their verdicts; where it lists a claim as unverified that a ` +
+        `refuter verdict above settles, the verdict and its corrected grade win):\n${critique}\n\n` +
+        `Run log (JSON):\n${JSON.stringify(coverage)}\n\n` +
         `Report path (for the receipt only; you write nothing): ${markdownPath}\n` +
         `HTML companion: ${wantHtml ? `requested (${htmlPath})` : "not requested; return html as null"}`
     );
+}
+
+/**
+ * Decide whether the reader stage left enough evidence to design from. The run aborts when every reader failed or
+ * when more than half did: a majority-unread evidence map would make the designs guesswork.
+ * @param {string[]} requestedIds every reader unit requested
+ * @param {string[]} unreadIds the units with no accepted output
+ * @returns {string | null} the failure message, or null when the run may continue
+ */
+export function readerCoverageFailure(requestedIds, unreadIds) {
+    if (unreadIds.length === 0) return null;
+    if (unreadIds.length >= requestedIds.length) {
+        return "no reader produced an accepted output; there is no evidence to design from";
+    }
+    if (unreadIds.length * 2 > requestedIds.length) {
+        return (
+            `${unreadIds.length} of ${requestedIds.length} reader units failed (more than half; unread: ` +
+            `${unreadIds.join(", ")}); the evidence map is too thin to design from`
+        );
+    }
+    return null;
+}
+
+/**
+ * Lowercase search needles for a reuse claim: each path token (backticks, wrapping punctuation and a trailing
+ * `:line` / `#Lnn` anchor stripped) and the component name. Tokens shorter than 4 characters are dropped as too noisy.
+ * @param {{ component?: string, path?: string }} claim
+ * @returns {string[]}
+ */
+export function claimNeedles(claim) {
+    const needles = new Set();
+    for (const raw of String(claim?.path ?? "").split(/[\s,;]+/)) {
+        const token = raw
+            .replace(/^[`*"'([]+|[`*"'.)\]]+$/g, "")
+            .replace(/(?::\d[\d\-–,]*|#L\d.*)$/, "")
+            .toLowerCase();
+        if (token.length >= 4) needles.add(token);
+    }
+    const component = String(claim?.component ?? "")
+        .replace(/[`*]/g, "")
+        .trim()
+        .toLowerCase();
+    if (component.length >= 4) needles.add(component);
+    return [...needles];
+}
+
+/**
+ * Cheap excerpt of the reader evidence that mentions a claim: every non-empty line of an accepted reader output that
+ * contains one of the claim's needles, tagged with its reader id, de-duplicated, in reader order. Bounded by
+ * `maxLines`, `maxChars`, and `maxRowChars` (per line) so a refuter prompt stays small.
+ * @param {[string, string][]} readerOutputs ordered [reader id, accepted output] pairs
+ * @param {{ component?: string, path?: string }} claim
+ * @returns {string} the excerpt, or "" when nothing matched
+ */
+export function evidenceExcerpt(readerOutputs, claim, { maxLines = 24, maxChars = 4000, maxRowChars = 500 } = {}) {
+    const needles = claimNeedles(claim);
+    if (needles.length === 0) return "";
+    const rows = [];
+    const seen = new Set();
+    let size = 0;
+    let truncated = false;
+    outer: for (const [id, text] of readerOutputs) {
+        if (typeof text !== "string") continue;
+        for (const line of text.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (trimmed === "") continue;
+            const lower = trimmed.toLowerCase();
+            if (!needles.some((n) => lower.includes(n))) continue;
+            const body = trimmed.length > maxRowChars ? `${trimmed.slice(0, maxRowChars)}…` : trimmed;
+            const row = `- [${id}] ${body}`;
+            if (seen.has(row)) continue;
+            if (rows.length >= maxLines || size + row.length + 1 > maxChars) {
+                truncated = true;
+                break outer;
+            }
+            seen.add(row);
+            rows.push(row);
+            size += row.length + 1;
+        }
+    }
+    if (rows.length === 0) return "";
+    return truncated ? `${rows.join("\n")}\n- (excerpt truncated)` : rows.join("\n");
+}
+
+/**
+ * Build one Refuter prompt: the question, the claim, and the reader rows that mention it as leads to verify.
+ * @returns {string}
+ */
+export function buildRefuterPrompt({ question, claim, excerpt }) {
+    return (
+        `Question:\n${question}\n\nReuse claim to refute:\n- Component: ${claim.component}\n- Path: ${claim.path}\n` +
+        `- Grade as claimed: ${claim.grade}\n- How it is reused: ${claim.how}\n\n` +
+        `Reader evidence rows that mention this claim's path or component (leads, not evidence — open the code and ` +
+        `confirm or break each before you rely on it):\n${excerpt || "(none found in the reader outputs)"}`
+    );
+}
+
+/**
+ * Build the Critic prompt. The critic runs concurrently with the refuters, so it gets no refuter verdicts; the Report
+ * worker reconciles the critique with the verdicts.
+ * @returns {string}
+ */
+export function buildCriticPrompt({ question, synthesis, evidenceMap }) {
+    return (
+        `Question:\n${question}\n\nSynthesis:\n${synthesis}\n\n` +
+        `Refuters are checking the synthesis's reuse claims concurrently; you do not receive their verdicts. Treat every ` +
+        `reuse claim as not yet verified.\n\nEvidence map:\n${evidenceMap}`
+    );
+}
+
+/**
+ * One line per claim pairing its original grade with the refuter outcome, for the Report worker.
+ * @param {{ id: string, component: string, path: string, originalGrade: string, grade: string, verdict?: string, confidence?: string, refuterStatus: string }[]} claims
+ * @param {number} cap the refuter cap, named in over-cap lines
+ * @returns {string} "" when there are no claims
+ */
+export function formatPairedVerdicts(claims, cap) {
+    return claims
+        .map((c) => {
+            const head = `- ${c.id} ${c.component} (${c.path}): claimed ${c.originalGrade}`;
+            if (c.refuterStatus === "not-attempted-over-cap") {
+                return `${head}; not refuted (over the ${cap}-claim cap) — unverified`;
+            }
+            if (c.refuterStatus === "failed") {
+                return `${head}; refuter failed twice — refuted, confidence low, corrected grade unverified`;
+            }
+            return `${head}; verdict ${c.verdict}, confidence ${c.confidence}, corrected grade ${c.grade}`;
+        })
+        .join("\n");
 }

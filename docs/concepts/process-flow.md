@@ -126,8 +126,8 @@ The PR stays a **draft** — no agent marks it ready or merges it.
 
 **On rejection.** A reviewer's findings loop back inside the coding loop — passed verbatim to
 the writer, re-reviewed, repeated until approved. This is an *internal* loop and does not
-cross the boundary. Only a stalled loop (the same finding twice with no progress) escalates
-to a human.
+cross the boundary. Only a stalled loop (the same finding twice with no progress, or a unit
+still unapproved after 3 review rounds) escalates to a human.
 
 **Commits.** The coding loop owns the commit step: `neo-code-writer` commits each completed
 unit to the feature branch once build/lint/tests are green, one commit per unit, in
@@ -204,7 +204,7 @@ telling you something about the Specification loop, not about the coders.
 Three edges run backward. Only the first is currently designed.
 
 **Review → Implement** `[live]` — inside the coding loop. Reviewer findings return to the
-writer verbatim. Bounded: a repeated finding with no progress escalates to a human.
+writer verbatim. Bounded: a repeated finding with no progress, or a unit unapproved after 3 rounds, escalates to a human.
 
 **Verification → Coding or Specification** `[target]` — Boundary 3 rejection, routed by BE
 diagnosis as above.

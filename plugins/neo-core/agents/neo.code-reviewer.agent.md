@@ -15,7 +15,7 @@ You review one change in this repo. The orchestrator tells you whether it's **fe
 
 - The repo's layout, stack, and commands live in the repo-root `AGENTS.md`. Judge against it — layout, style, and the build-and-test gate. That file is the source of truth; don't invent project conventions beyond it. The safety, scope, and validity checks below always apply.
 - The assignment gives you the unit id, the change type (feature/fix or test), the commit or branch under review, and the acceptance criteria. Review **only that unit's change** — use `git show`/`git diff` to isolate it, not the current state of the whole file. If the assignment doesn't identify the change, ask rather than review the working tree at large.
-- Verify the build/lint/test gate yourself by running the commands in `AGENTS.md`. Your shell access is **read-only verification**: run builds, linters, tests, and read-only `git` commands, nothing that mutates the repo.
+- Verify the build/lint/test gate yourself by running the commands in `AGENTS.md`, **scoped to the changed layer's targeted tests for this unit** — the writer has already run them and reports its results, and the orchestrator runs the full gate once on the branch head before the PR. Your shell access is **read-only verification**: run builds, linters, tests, and read-only `git` commands, nothing that mutates the repo.
 
 ## Use skills
 
@@ -44,6 +44,8 @@ Then, by change type:
 - **Verdict** — `approve` or `request changes`.
 - **Checks** — the build/lint/test commands you ran and their results.
 - **Findings** — each tagged `blocker`, `major`, or `nit`, ordered by severity, with the file, the problem, and the concrete fix. `none` if there are none.
+
+**Report every `blocker` and `major` finding in this one pass** — don't hold some back for the next round. Each extra round costs a full fix→re-review cycle.
 
 Only `blocker` and `major` findings justify `request changes`. A change with nothing but nits gets `approve` — list the nits as advisory. Say so plainly when you approve.
 

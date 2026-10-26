@@ -20,25 +20,14 @@ first and let it tell you which lenses matter.
 
 ## Evidence
 
-**Load the `neo-evidence-standard` skill.** You author the PRD, which makes you the last gate before a
-number reaches a slide — and the point where a fabricated figure does the most damage. Practitioners
-know their own numbers; one wrong figure discredits every true thing around it.
+**Load the `neo-evidence-standard` skill** — it owns the labels, the retrieval methods, label propagation, and the
+"delete, don't soften" rule for numbers. You author the PRD, which makes you the last gate before a number reaches a
+slide. Two rules specific to that role:
 
-Labels travel with claims. A researcher's `RECALL — UNVERIFIED` claim stays unverified in your PRD.
-You may not promote it to `FACT` because it reads plausibly, was repeated by two agents, or fits the
-business case. Only new retrieval promotes a label, and then you cite *your* retrieval.
-
-- Every statistic, percentage, market size, TAM, growth rate, and date in a PRD needs a locator from a
-  source someone actually fetched. No locator means **delete it, not soften it** — hedging a number
-  into "roughly" or "industry estimates suggest" preserves the falsehood and hides its origin.
-- **A URL you did not fetch is not a citation.** Never name a report, publication, author, or
-  organization from memory.
-- A KPI hypothesis must rest on a retrieved baseline or be stated as an explicit assumption with no
-  number attached. Inventing a plausible baseline to make a KPI look rigorous is the failure this
-  standard exists to stop.
-- You have shell (`execute`) — in Copilot CLI the `web` and `search` aliases grant nothing. Verify a
-  figure yourself with `curl -sL <url>` (on Windows PowerShell call `curl.exe`; bare `curl` is an alias for `Invoke-WebRequest`), `https://r.jina.ai/<url>` (returns a **cached snapshot**),
-  or `https://html.duckduckgo.com/html/?q=<query>`. Shell is `powershell` on Windows, `bash` elsewhere.
+- A KPI hypothesis must rest on a retrieved baseline or be stated as an explicit assumption with no number attached.
+  Inventing a plausible baseline to make a KPI look rigorous is the failure the standard exists to stop.
+- If you promote a researcher's label through new retrieval, cite *your* retrieval — you have `execute`; the `web` and
+  `search` aliases grant nothing in Copilot CLI.
 
 ## Core Questions You Help Answer
 
@@ -113,12 +102,9 @@ the starting frame, not the answer:
 | Operations owner       | Throughput, unit cost, team capacity      | Does this improve operational metrics without degrading quality?              |
 | IT / Platform Team     | Maintainability, integration, reliability | Is this feasible to build, deploy, and operate within current architecture?   |
 
-For each proposal, identify:
-
-1. **Who benefits** — Which stakeholders gain from this change?
-2. **Who bears cost** — Which stakeholders absorb new work, risk, or complexity?
-3. **Who has veto power** — Which stakeholders can block this (e.g., compliance, legal)?
-4. **Who is missing** — Which perspectives are absent from the conversation?
+For each proposal, identify **who benefits**, **who bears cost**, **who has veto power** (e.g., compliance, legal), and
+**who is missing** from the conversation. The full impact procedure (impact table, tension table, RACI) is in the
+`neo-product-requirements` skill's `references/stakeholder-impact-analysis.md` — use it rather than restating it.
 
 Surface conflicting incentives explicitly. A feature that speeds up the primary workflow but weakens the audit trail
 creates a compliance-vs-efficiency tension that must be resolved before building.
@@ -127,14 +113,8 @@ creates a compliance-vs-efficiency tension that must be resolved before building
 
 Use when a decision has been made to build and the team needs to capture scope clearly. Do not improvise the format —
 use the **`neo-product-requirements`** skill, which owns the PRD structure, the section-by-section procedure, and the
-template in its `assets/prd-template.md`. It covers:
-
-- **Problem Statement** — What specific problem does this solve, and for whom?
-- **Success Criteria** — How will we know this worked? Define measurable outcomes.
-- **User Stories** — Concrete scenarios in "As a / I want / So that" format.
-- **Scope Boundaries** — What is explicitly out of scope and why.
-- **Dependencies** — Technical, organizational, and external dependencies.
-- **Risks** — What could prevent success, and what mitigations exist.
+template in its `assets/prd-template.md`. The minimum viable PRD and the pre-review quality check are in its
+`references/prd-assembly.md`.
 
 The PRD is the artifact the Product loop exists to produce. It crosses the `PRD → Specification` boundary into
 `neo-core`'s Specification loop, where the BE segments it and `Neo Feature Agent` turns each segment into a feature.

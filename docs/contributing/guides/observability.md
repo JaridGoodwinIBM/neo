@@ -5,11 +5,15 @@ Records what each agent does into a JSONL log so you can tune the `.agent.md` pr
 > **Windows cost.** Each hook launches a nested `pwsh` so that ambient execution policy cannot
 > refuse the script file (see [enforcement.md](enforcement.md) § Opting in for why). Measured on
 > a warm Windows 11 client that costs roughly **270 ms per hook invocation** on top of the
-> harness's own launch, and every installed Neo plugin registers the same events, so with two
-> plugins installed a tool call that fires `postToolUse` pays it about four times — more with three. Unix invokes `bash "$s"` for the same reason, but at no
+> harness's own launch, and every installed Neo plugin registers the same events, so with three
+> plugins installed every tool call fires `postToolUse` three times. To keep that cheap,
+> **`postToolUse` is not logged by default**: the logger checks `NEO_LOG_TOOL_CALLS` before
+> doing anything else (no `jq` probe, `git`, `date`, or `mkdir`), drains stdin, and exits — so
+> a tool call pays only the interpreter launch. Set `NEO_LOG_TOOL_CALLS=1` to log tool calls.
+> Unix invokes `bash "$s"` for the same reason, but at no
 > added cost — it replaces the shebang's own `env` lookup rather than adding a process (measured
-> 243 ms vs 259 ms for the direct form). If that matters more to you than the logs, turn logging
-> off with `NEO_LOG_HOOKS=0`.
+> 243 ms vs 259 ms for the direct form). If even the lifecycle events matter more to you than the
+> logs, turn logging off entirely with `NEO_LOG_HOOKS=0`.
 
 > This page covers the **fail-open observability** hook set, which is the only thing
 > `hooks/hooks.json` registers. For the **opt-in, fail-closed `preToolUse` enforcement**
@@ -67,6 +71,8 @@ cmd /c "type `"$env:TEMP\p.json`" | pwsh -NoProfile -ExecutionPolicy Bypass -Fil
 echo '{"tool_name":"t","success":true,"content":"hi"}' | hooks/scripts/log-event.sh userPromptSubmitted
 ```
 
+(Testing `postToolUse` by hand writes nothing unless `NEO_LOG_TOOL_CALLS=1` is set.)
+
 Then check `~/.agent-logs/events.jsonl` for the new line.
 
 ### Set the env quickly
@@ -97,6 +103,16 @@ Each line: `ts`, `run` (correlation id — defaults to git branch), `event`, `ag
 
 Set `AGENT_RUN_ID` to correlate all events for one spec/task; otherwise the current git branch is used, which works well with the feature-branch-per-spec flow.
 
+| Env var              | Default              | Effect                                                                                                    |
+| -------------------- | -------------------- | --------------------------------------------------------------------------------------------------------- |
+| `AGENT_LOG_DIR`      | `~/.agent-logs`      | Where `events.jsonl` is written.                                                                          |
+| `AGENT_RUN_ID`       | current git branch   | Correlation id. Setting it also skips the `git rev-parse` each event would otherwise run.                 |
+| `NEO_LOG_TOOL_CALLS` | off                  | `1` logs `postToolUse` (one record per tool call). Off, `postToolUse` exits immediately; lifecycle events (`sessionStart`, `userPromptSubmitted`, `agentStop`, `subagentStop`, `preCompact`, `errorOccurred`, `sessionEnd`) are still logged. |
+| `NEO_LOG_HOOKS`      | on                   | `0` disables all logging from `log-event.{sh,ps1}`.                                                       |
+
+All four are read from the environment the Copilot CLI hands its hooks, so set them in the shell
+you launch `copilot` from.
+
 ## Analyze
 
 ```bash
@@ -105,6 +121,11 @@ python3 analyze_agent_logs.py path/to.jsonl   # explicit path
 python3 analyze_agent_logs.py path --run feat/42-login
 python3 analyze_agent_logs.py path --json     # machine-readable
 ```
+
+Per-agent `tool_calls` / `top_tools` and per-run `tool_calls` are built from `postToolUse`
+records, so they read **0** unless the session ran with `NEO_LOG_TOOL_CALLS=1`. Event counts,
+active time, worker completions, and review rounds come from lifecycle events and need nothing
+extra.
 
 Reports event/tool counts and approximate active time per agent, and per run the wall-clock duration, worker completions, and review→fix rounds. More than one review round on a run is flagged — that's your signal to tighten the writer prompt or the acceptance criteria.
 

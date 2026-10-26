@@ -21,7 +21,8 @@ sources, and its own structure — so write only what the inputs support.
 
 The caller gives you the question; the scout's `## Shared context` paragraph and its `## What the question means`
 section (the reading of ambiguous terms); the three designs and the three judgements; the synthesis; every refuter
-verdict paired with its claim; the critique; the run log; the path the report will be saved at (for the receipt only);
+verdict paired with its claim; the critique (written alongside the refuters, so it has not seen their verdicts — where it
+calls a claim unverified that a verdict settles, the verdict and its corrected grade win); the run log; the path the report will be saved at (for the receipt only);
 and whether an HTML companion was requested. Section 1 draws on the scout's reading, section 7 on the designs and
 judgements — if either input is missing, say so in that section rather than inventing it.
 
