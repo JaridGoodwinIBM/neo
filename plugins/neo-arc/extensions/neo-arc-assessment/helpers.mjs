@@ -318,9 +318,84 @@ export function validateReportArgs(args) {
     return { ok: true, question: q.question, outputPath, html: args.html === true, overwrite: args.overwrite === true };
 }
 
+const TAG_OPEN = /<([a-zA-Z][^\s/>]*)/y;
+const URL_ATTRIBUTES = new Set([
+    "src", "srcset", "href", "xlink:href", "action", "formaction", "poster", "data", "background", "ping",
+    "manifest", "codebase", "archive", "lowsrc", "dynsrc",
+]);
+const LINK_ATTRIBUTES = new Set(["href", "xlink:href"]);
+
 /**
- * Reject active or external content in a report HTML document. Deterministic substring/regex policy:
- * no scripts, event handlers, javascript: URLs, embedding elements, meta refresh, or external resources.
+ * Yield each start tag's name and attributes, roughly as an HTML tokenizer reads them: a quoted value may contain `>`,
+ * an unterminated quote runs to the end of the document, and comments are skipped. Text outside tags is never parsed.
+ * @returns {Generator<{ tag: string, attrs: { name: string, value: string }[] }>}
+ */
+function* startTags(html) {
+    const n = html.length;
+    const space = (c) => c === " " || c === "\t" || c === "\n" || c === "\r" || c === "\f";
+    let i = 0;
+    while (i < n) {
+        const lt = html.indexOf("<", i);
+        if (lt === -1) return;
+        if (html.startsWith("<!--", lt)) {
+            const close = html.indexOf("-->", lt + 4);
+            if (close === -1) return;
+            i = close + 3;
+            continue;
+        }
+        TAG_OPEN.lastIndex = lt;
+        const m = TAG_OPEN.exec(html);
+        if (!m) {
+            i = lt + 1;
+            continue;
+        }
+        let j = TAG_OPEN.lastIndex;
+        const attrs = [];
+        while (j < n) {
+            while (j < n && (space(html[j]) || html[j] === "/")) j++;
+            if (j >= n || html[j] === ">") break;
+            let k = j + 1;
+            while (k < n && !space(html[k]) && html[k] !== "/" && html[k] !== ">" && html[k] !== "=") k++;
+            const name = html.slice(j, k).toLowerCase();
+            j = k;
+            while (j < n && space(html[j])) j++;
+            let value = "";
+            if (html[j] === "=") {
+                j++;
+                while (j < n && space(html[j])) j++;
+                const quote = html[j];
+                if (quote === '"' || quote === "'") {
+                    const close = html.indexOf(quote, j + 1);
+                    const stop = close === -1 ? n : close;
+                    value = html.slice(j + 1, stop);
+                    j = stop + 1;
+                } else {
+                    k = j;
+                    while (k < n && !space(html[k]) && html[k] !== ">") k++;
+                    value = html.slice(j, k);
+                    j = k;
+                }
+            }
+            attrs.push({ name, value });
+        }
+        yield { tag: m[1].toLowerCase(), attrs };
+        i = j + 1;
+    }
+}
+
+/** A URL value that leaves the document: any scheme except `data:`, or protocol-relative. */
+function urlLeavesDocument(value) {
+    const v = value.replace(/[\t\n\r]/g, "").trim().replace(/\\/g, "/");
+    if (v.startsWith("//")) return true;
+    const scheme = /^([a-z][a-z0-9+.-]*):/i.exec(v);
+    return scheme !== null && scheme[1].toLowerCase() !== "data";
+}
+
+/**
+ * Reject active or external content in a report HTML document. Deterministic policy: no scripts, inline event
+ * handlers (`on*` attributes inside a tag), javascript: URLs, embedding elements, meta refresh, or resource-loading
+ * references (`src`, `srcset`, `<link>`, `@import`, `url()`, SVG `<image>`/`<use>` `href`, …) that leave the
+ * document. Hyperlinks are allowed: an `<a>` element may carry an `href` to an `http:` or `https:` URL.
  * This is a best-effort denylist, not a sanitizer: it does not decode entities (e.g. `javascript&colon;` passes)
  * and passing it is no guarantee the HTML is safe.
  * @returns {string | null} a description of the first violation, or null when clean
@@ -331,14 +406,20 @@ export function findActiveHtml(html) {
         [/<\s*(iframe|frame|frameset|object|embed|applet|base|form)\b/i, "embedding or form element"],
         [/<\s*meta\b[^>]*http-equiv/i, "<meta http-equiv>"],
         [/<\s*link\b/i, "<link> element"],
-        [/\bon[a-z]+\s*=/i, "inline event handler"],
         [/(?:javascript|vbscript)\s*:/i, "javascript: URL"],
-        [/\b(?:src|href|action|poster|data|srcset|xlink:href)\s*=\s*["']?\s*(?:https?:|\/\/|ftp:)/i, "external URL attribute"],
         [/@import\b/i, "@import"],
-        [/url\(\s*["']?\s*(?:https?:|\/\/)/i, "external url() reference"],
+        [/url\(\s*["']?\s*(?:[a-z][a-z0-9+.-]*:(?<!data:)|\/\/|\\\\)/i, "external url() reference"],
         [/\bdata:\s*text\/html/i, "data:text/html URL"],
     ];
     for (const [re, label] of rules) if (re.test(html)) return label;
+    for (const { tag, attrs } of startTags(html)) {
+        for (const { name, value } of attrs) {
+            if (/^on[a-z]/.test(name)) return "inline event handler";
+            if (!URL_ATTRIBUTES.has(name) || !urlLeavesDocument(value)) continue;
+            const hyperlink = tag === "a" && LINK_ATTRIBUTES.has(name) && /^https?:/i.test(value.replace(/[\t\n\r]/g, "").trim());
+            if (!hyperlink) return `external URL attribute (${name} on <${tag}>)`;
+        }
+    }
     return null;
 }
 

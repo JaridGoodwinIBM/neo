@@ -137,7 +137,16 @@ test("findActiveHtml flags each denylisted construct", () => {
         link: '<link rel="stylesheet" href="#">',
         "meta refresh": '<meta http-equiv="refresh" content="0;url=#">',
         "external src": '<img src="https://example.com/a.png">',
-        "external href": '<a href="http://example.com">x</a>',
+        "external stylesheet": '<link rel="stylesheet" href="https://example.com/a.css">',
+        "external script": '<script src="https://example.com/a.js"></script>',
+        "svg image href": '<svg><image href="https://example.com/a.png"/></svg>',
+        "svg use xlink:href": '<svg><use xlink:href="https://example.com/s.svg#i"/></svg>',
+        "protocol-relative link": '<a href="//example.com">x</a>',
+        "non-http link": '<a href="ftp://example.com/f">x</a>',
+        "link ping": '<a href="https://example.com" ping="https://example.com/t">x</a>',
+        "handler after quoted >": '<a title="a>b" onclick="x()">x</a>',
+        "handler after stray quote": "<div x' onclick=y()>",
+        "uppercase handler": "<DIV ONCLICK=x()>",
         "protocol-relative": '<img src="//example.com/a.png">',
         "external srcset": "<img srcset='https://example.com/a.png 1x'>",
         "css import": "<style>@import 'a.css';</style>",
@@ -162,6 +171,19 @@ test("findActiveHtml passes benign self-contained HTML (best-effort denylist onl
         "<h2 id='section-1'>One</h2></body></html>",
     ].join("");
     assert.equal(findActiveHtml(html), null);
+});
+
+test("findActiveHtml allows http(s) hyperlinks and handler-like text outside tags", () => {
+    const allowed = {
+        "https link": '<p>Source: <a href="https://example.com/docs?a=1#b">docs</a></p>',
+        "http link with target": "<a target=_blank href='http://example.com'>x</a>",
+        "on-word in a cell": "<table><tr><td>one = per area</td></tr></table>",
+        "on-word in code": "<code>onboarding=true</code>",
+        "on-word in a comment": "<!-- <div onclick=x()> -->",
+        "svg fragment url": "<svg><rect fill='url(#g)' width='1' height='1'/></svg>",
+    };
+    for (const [name, html] of Object.entries(allowed)) assert.equal(findActiveHtml(html), null, name);
+    assert.equal(typeof findActiveHtml("<div onclick=\"x()\">x</div>"), "string");
 });
 
 // ---- validateReportResult ----
