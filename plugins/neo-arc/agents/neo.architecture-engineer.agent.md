@@ -52,7 +52,7 @@ the `agent` tool; run the parallel stages as parallel invocations.
 | `Neo Arc Synthesizer` | evidence map + designs + judgements | Synthesis template | 1 |
 | `Neo Arc Refuter` | one reuse claim + the question | Refuter template | one per claim, in parallel, max 16 |
 | `Neo Arc Critic` | synthesis + verdicts + evidence map | Critic template | 1 |
-| `Neo Arc Report` | question + synthesis + verdicts + critique + run log + output path | Report content (Markdown, optional HTML) and receipt — it writes no file | 1 |
+| `Neo Arc Report` | question + scout's shared context and question reading + designs + judgements + synthesis + verdicts + critique + run log + output path | Report content (Markdown, optional HTML) and receipt — it writes no file | 1 |
 | `Neo Arc Factcheck` | the written report's path + one check kind | Fact-checker template | 3, in parallel |
 
 ## Before you start
@@ -73,7 +73,7 @@ Track the stages with your todo list so a long run stays legible.
 ### 1. Scout — one run, nothing spawns until it returns
 
 Invoke `Neo Arc Scout` with the question. **Keep its brief verbatim**; it is the input to every reader prompt. Its
-`## Shared context` paragraph goes, unchanged, into every reader, designer, judge, and synthesizer prompt.
+`## Shared context` paragraph goes, unchanged, into every reader, designer, judge, synthesizer, and report prompt.
 
 ### 2. Readers — one per area, in parallel
 
@@ -131,8 +131,10 @@ Invoke `Neo Arc Critic` with the synthesis, every refuter verdict (paired with i
 
 ### 9. Report — one run
 
-Invoke `Neo Arc Report` with the question, the synthesis, the verdicts paired with their claims, the critique, the
-run log, and the output path. It **returns** Markdown with Mermaid figures and writes nothing; ask it for an HTML
+Invoke `Neo Arc Report` with the question, the scout's `## Shared context` paragraph and `## What the question means`
+section (its reading of ambiguous terms, for the report's title section), the three designs and the three judgements
+(for its designs-considered section), the synthesis, the verdicts paired with their claims, the critique, the run log,
+and the output path. It **returns** Markdown with Mermaid figures and writes nothing; ask it for an HTML
 companion **only** when the user asked for one. The report must carry the **refuters' corrected grades**, not the
 synthesizer's originals — check its receipt says so.
 

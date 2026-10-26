@@ -366,3 +366,36 @@ export function validateReportResult(result, htmlRequested) {
     if (!check.ok) return { ok: false, error: `report receipt is off template: ${check.problems.join("; ")}` };
     return { ok: true, markdown, html: htmlRequested ? html : null, receipt };
 }
+
+/**
+ * Build the Report worker's prompt. It carries every input the report sections draw on: the scout's shared context
+ * and reading of the question (section 1), the three designs and three judgements (section 7), the synthesis, the
+ * paired refuter verdicts, the critique, and the run log.
+ * @returns {string}
+ */
+export function buildReportPrompt({
+    question,
+    date,
+    sharedContext,
+    questionMeaning,
+    designs,
+    judgements,
+    synthesis,
+    pairedVerdicts,
+    critique,
+    coverage,
+    markdownPath,
+    htmlPath,
+    wantHtml,
+}) {
+    return (
+        `Question:\n${question}\n\nDate: ${date}\n\n` +
+        `Shared context (from the scout):\n${sharedContext || "(none)"}\n\n` +
+        `What the question means (the scout's reading of ambiguous terms):\n${questionMeaning || "(none)"}\n\n` +
+        `The three designs:\n${designs}\n\nThe three judgements:\n${judgements}\n\n` +
+        `Synthesis:\n${synthesis}\n\nRefuter verdicts paired with their claims:\n${pairedVerdicts || "(no reuse claims)"}\n\n` +
+        `Critique:\n${critique}\n\nRun log (JSON):\n${JSON.stringify(coverage)}\n\n` +
+        `Report path (for the receipt only; you write nothing): ${markdownPath}\n` +
+        `HTML companion: ${wantHtml ? `requested (${htmlPath})` : "not requested; return html as null"}`
+    );
+}

@@ -4,6 +4,7 @@ import {
     FACTCHECK_KINDS,
     REUSE_GRADES,
     TEMPLATES,
+    buildReportPrompt,
     checkTemplate,
     classifyFindings,
     deriveReportPath,
@@ -424,12 +425,21 @@ const neoArcAssessment = defineWorkflow({
         // Report: the worker returns content only; this workflow alone writes the files.
         ctx.phase("Report");
         const coverage = buildCoverage();
-        const reportPrompt =
-            `Question:\n${question}\n\nDate: ${paths.date}\n\n` +
-            `Synthesis:\n${outputs.synthesizer}\n\nRefuter verdicts paired with their claims:\n${pairedVerdicts || "(no reuse claims)"}\n\n` +
-            `Critique:\n${outputs.critic}\n\nRun log (JSON):\n${JSON.stringify(coverage)}\n\n` +
-            `Report path (for the receipt only; you write nothing): ${paths.markdownPath}\n` +
-            `HTML companion: ${wantHtml ? `requested (${paths.htmlPath})` : "not requested; return html as null"}`;
+        const reportPrompt = buildReportPrompt({
+            question,
+            date: paths.date,
+            sharedContext,
+            questionMeaning: sectionText(outputs.scout, "What the question means"),
+            designs,
+            judgements,
+            synthesis: outputs.synthesizer,
+            pairedVerdicts,
+            critique: outputs.critic,
+            coverage,
+            markdownPath: paths.markdownPath,
+            htmlPath: paths.htmlPath,
+            wantHtml,
+        });
         // The schema call's own single retry is the only retry the Report worker gets.
         const reportRaw = await ctx.step(`${STEP_VERSION}:report:content`, async () => {
             const result = await ctx.agent(reportPrompt, {

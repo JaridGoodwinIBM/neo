@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
     TEMPLATES,
+    buildReportPrompt,
     checkTemplate,
     nextAttempt,
     normalizeQuestion,
@@ -212,4 +213,28 @@ test("propagateGrades marks missing or invalid corrections unverified and keeps 
         assert.equal(out[i].originalGrade, c.grade);
         assert.equal(out[i].unverified, true);
     }
+});
+
+test("buildReportPrompt carries the scout reading, designs and judgements the report sections need", () => {
+    const prompt = buildReportPrompt({
+        question: "Q?",
+        date: "2026-01-01",
+        sharedContext: "SHARED-CONTEXT",
+        questionMeaning: "MEANING-OF-TERMS",
+        designs: "### Design 1 (smallest)\n\nDESIGN-THESIS",
+        judgements: "### Judgement 1 (maintainer)\n\nJUDGE-SCORES",
+        synthesis: "SYNTHESIS",
+        pairedVerdicts: "",
+        critique: "CRITIQUE",
+        coverage: { readers: 3 },
+        markdownPath: "docs/design/assessments/a.md",
+        htmlPath: "docs/design/assessments/a.html",
+        wantHtml: false,
+    });
+    for (const part of ["SHARED-CONTEXT", "MEANING-OF-TERMS", "DESIGN-THESIS", "JUDGE-SCORES", "SYNTHESIS", "CRITIQUE"]) {
+        assert.ok(prompt.includes(part), part);
+    }
+    assert.ok(prompt.includes("(no reuse claims)"));
+    assert.ok(prompt.includes('{"readers":3}'));
+    assert.ok(prompt.includes("not requested; return html as null"));
 });
